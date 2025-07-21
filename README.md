@@ -6,7 +6,7 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 
 ### For Card Players (`/player`)
 - 🎫 **Multi-Card Management**: Generate and manage up to 6 tombola cards simultaneously
-- 📊 **Real-time Scoring**: Live tracking of lines completed and BINGO achievements  
+- 📊 **Real-time Scoring**: Live tracking of lines completed and BINGO achievements
 - 🏆 **Achievement Notifications**: Visual feedback for completed lines and special achievements
 - 📱 **Mobile Optimized**: Responsive design perfect for mobile gameplay
 - ⚡ **Auto-sync**: Automatic updates every 3 seconds to stay synchronized with the game
@@ -50,7 +50,7 @@ npm run dev
 
 ### 4. Access the Application
 - **Main Menu**: http://localhost:5173
-- **Card Player Interface**: http://localhost:5173/player  
+- **Card Player Interface**: http://localhost:5173/player
 - **Board Operator Interface**: http://localhost:5173/board
 
 ## 🏗️ Architecture
@@ -85,7 +85,7 @@ npm run dev
 4. **Win**: Complete lines horizontally, vertically, or diagonally for points
 5. **BINGO**: Fill an entire card to achieve BINGO status!
 
-### For Board Operators  
+### For Board Operators
 1. **Connect**: Navigate to `/board` - automatically registers as board viewer
 2. **Extract Numbers**: Click "Extract Number" to draw the next number
 3. **Monitor**: Watch the large board display and recent extractions
@@ -97,7 +97,7 @@ npm run dev
 ### Build Commands
 ```bash
 npm run dev          # Start development server
-npm run build        # Build for production  
+npm run build        # Build for production
 npm run preview      # Preview production build
 npm run check        # Run type checking
 npm run lint         # Run ESLint
@@ -123,7 +123,7 @@ src/
 The web client communicates with the Rust Tombola API server through RESTful endpoints:
 
 - `GET /game/state` - Retrieve current game state
-- `POST /game/register` - Register as player or viewer  
+- `POST /game/register` - Register as player or viewer
 - `POST /game/extract` - Extract next number (operators only)
 - `POST /game/new` - Start new game (operators only)
 - `POST /game/dump` - Dump current game (operators only)
@@ -137,7 +137,7 @@ The `Board.svelte` component supports two size variants:
 
 ### Responsive Breakpoints
 - **Mobile**: < 768px (single column layout, smaller controls)
-- **Tablet**: 768px - 1024px (adaptive grid layouts)  
+- **Tablet**: 768px - 1024px (adaptive grid layouts)
 - **Desktop**: > 1024px (full two-column layout)
 
 ## 🤝 Contributing
