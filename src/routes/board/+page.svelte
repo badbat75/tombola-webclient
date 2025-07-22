@@ -55,7 +55,7 @@
 
     await gameActions.connect();
     if (gameState.isConnected) {
-      // Auto-register as board viewer
+      // Auto-register as board client (no API call needed)
       await handleRegister();
       // Start auto-refresh
       gameActions.startAutoRefresh(2000);
@@ -77,7 +77,7 @@
   async function handleRegister() {
     gameActions.clearError();
     isRegistering = true;
-    await gameActions.register('Board Viewer', 0); // Register as viewer with 0 cards
+    await gameActions.registerAsBoard(); // Register as board client with special ID
     isRegistering = false;
   }
 

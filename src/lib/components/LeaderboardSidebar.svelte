@@ -1,6 +1,7 @@
 <script lang="ts">
   import { gameState, gameUtils, clientUtils } from '$lib/gameStore.svelte.js';
   import { tombolaApi } from '$lib/api.js';
+  import { getScoreText, getScoreColor, getNextScoreLevel, isBingo, isMajorAchievement } from '../scoreUtils.js';
 
   // Cache for resolved client names
   let resolvedNames = $state<Map<string, string>>(new Map());
@@ -74,7 +75,8 @@
           cardId: achievement.card_id,
           score: score,
           numbers: achievement.numbers,
-          isBingo: score === 15
+          isBingo: isBingo(score),
+          isMajor: isMajorAchievement(score)
         });
       }
     }
@@ -104,14 +106,15 @@
     <div class="score-display">
       {#if gameState.scoreCard.published_score === 15}
         <span class="next-achievement">🎮 NEW GAME</span>
-      {:else if gameState.scoreCard.published_score >= 5}
-        <span class="bingo-achievement">🎉 BINGO!</span>
-      {:else if gameState.scoreCard.published_score >= 2}
-        <span class="next-achievement">⭐ {gameState.scoreCard.published_score + 1} in line</span>
       {:else}
-        <span class="next-achievement">⭐ 2 in line</span>
+        {@const nextLevel = getNextScoreLevel(gameState.scoreCard.published_score)}
+        {#if nextLevel}
+          <span class="next-achievement" style="color: {getScoreColor(nextLevel)}">{getScoreText(nextLevel)}</span>
+        {:else}
+          <span class="next-achievement">⭐ 2 in line</span>
+        {/if}
       {/if}
-  </div>
+    </div>
   </div>
 
   <!-- Top Achievements List -->
@@ -131,14 +134,8 @@
         >
           <div class="achievement-details">
             <div class="main-info">
-              <span class="achievement-text">
-                {#if achievement.isBingo}
-                  <span class="bingo-text">BINGO!</span>
-                {:else if achievement.score === 5}
-                  <span class="line-text">Full Line</span>
-                {:else}
-                  <span class="score-text">{achievement.score} in line</span>
-                {/if}
+              <span class="achievement-text" style="color: {getScoreColor(achievement.score)}">
+                {getScoreText(achievement.score)}
               </span>
               <span class="separator"> - </span>
               <span class="client-name">{getClientDisplayName(achievement.clientId)}</span>
@@ -194,11 +191,6 @@
     padding: 8px;
     margin: 4px 0;
     border: 1px solid #ffecb3;
-  }
-
-  .score-display .bingo-achievement {
-    color: #c62828;
-    font-weight: bold;
   }
 
   .score-display .next-achievement {
@@ -266,21 +258,6 @@
 
   .achievement-text {
     font-weight: 600;
-  }
-
-  .bingo-text {
-    color: #c62828;
-    font-weight: bold;
-  }
-
-  .line-text {
-    color: #ff6b35;
-    font-weight: bold;
-  }
-
-  .score-text {
-    color: #1976d2;
-    font-weight: 500;
   }
 
   .card-info {

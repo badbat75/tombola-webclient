@@ -5,11 +5,13 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 ## 🎯 Features
 
 ### Multi-Game Architecture Support
-- 🎮 **Game Discovery**: Browse available games with status and player counts
+- 🎮 **Game Discovery**: Browse available games with detailed status information
 - ✨ **Game Creation**: Create new games directly from the web interface
-- 🔀 **Game Selection**: Choose your preferred game before accessing player or board modes
-- 📊 **Game Status**: View game creation times, player counts, and activity status
-- �️ **Client Name Resolution**: Proper display of player names instead of client IDs
+- 🔀 **Game Selection**: Choose your preferred game with enhanced information display
+- 📊 **Detailed Game Status**: View player counts, card assignments, extraction progress, and best scores
+- 📈 **Progress Visualization**: Visual progress bars showing game completion status
+- 🏆 **Achievement Tracking**: Display current best scores and prize levels per game
+- 🗂️ **Client Name Resolution**: Proper display of player names instead of client IDs
 
 ### For Card Players (`/player?gameId={game_id}`)
 - 🎫 **Multi-Card Management**: Generate and manage up to 6 tombola cards simultaneously
@@ -24,6 +26,7 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 - 📊 **Live Leaderboard**: Real-time player rankings and scores with proper name resolution
 - 🎯 **Visual Separators**: Clear section divisions with horizontal and vertical separators
 - 📈 **Recent Extractions**: Prominent display of recently drawn numbers
+- 🔑 **Board Client Authentication**: Uses special client ID `"0000000000000000"` (no registration required)
 
 ### Universal Features
 - 🌐 **Real-time Connectivity**: REST API communication with Rust backend for game-specific operations
@@ -90,12 +93,14 @@ npm run dev
 ```
 
 ### Key Components
-- **`GameSelector.svelte`**: Game discovery, selection, and creation interface
+- **`GameSelector.svelte`**: Game discovery, selection, and creation interface with enhanced score display
 - **`Board.svelte`**: Configurable board component with `normal`/`large` size variants
 - **`Card.svelte`**: Individual tombola card with number tracking
 - **`GameFooter.svelte`**: Connection status and game information
-- **`LeaderboardSidebar.svelte`**: Real-time player rankings with name resolution
+- **`LeaderboardSidebar.svelte`**: Real-time player rankings with name resolution and color-coded achievements
+- **`ScoreBoard.svelte`**: Achievement display with consistent score formatting
 - **`gameStore.svelte.ts`**: Centralized game state management with Svelte 5 runes and client caching
+- **`scoreUtils.ts`**: Centralized score mapping and formatting utilities
 
 ### Technology Stack
 - **Frontend**: SvelteKit 5, TypeScript, Vite
@@ -107,7 +112,12 @@ npm run dev
 ## 🎮 How to Play
 
 ### Getting Started
-1. **Select Game**: Navigate to http://localhost:5173 and browse available games
+1. **Select Game**: Navigate to http://localhost:5173 and browse available games with detailed information:
+   - **Game Status**: New, Active, or Closed games with visual indicators
+   - **Player Count**: Number of registered players and assigned cards
+   - **Progress**: Visual progress bars showing extraction completion (0-90 numbers)
+   - **Best Scores**: Current highest achievements and prize levels
+   - **Creation Time**: When each game was created
 2. **Create Game** (Optional): Click "Create New Game" to start a fresh game
 3. **Choose Mode**: Select either "Player (Cards)" or "Board (Operator)" mode
 
@@ -129,6 +139,17 @@ npm run dev
 - **Game Discovery**: Easy browsing of active games with player counts and status
 - **Flexible Participation**: Join any available game or create your own
 - **Isolated State**: Each game maintains completely separate state and progress
+
+### 🏆 Score System
+The game uses a standardized scoring system with consistent visual representation:
+
+- **📍 2 in Line** - Two numbers marked in a line (blue theme)
+- **📌 3 in Line** - Three numbers marked in a line (green theme)
+- **🎯 4 in Line** - Four numbers marked in a line (yellow theme)
+- **🏆 5 in Line** - Full line completion (orange theme)
+- **🎉 BINGO!!!** - Complete card filled (red theme)
+
+All components use the centralized `scoreUtils.ts` for consistent score display, colors, and messaging across the entire application.
 
 ## 🛠️ Development
 

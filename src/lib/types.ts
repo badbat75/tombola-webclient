@@ -26,9 +26,11 @@ export interface GameStatus {
   status: string;
   game_id: string;
   created_at: string;
+  closed_at?: string;
+  players: string;
+  cards: string;
   numbers_extracted: number;
   scorecard: number;
-  server: string;
 }
 
 export interface Board {
@@ -67,7 +69,9 @@ export interface GameInfo {
   game_id: string;
   status: string;
   start_date: string;
-  close_date: string | null;
+  close_date?: string;
+  client_count?: number;
+  extracted_numbers?: number;
 }
 
 export interface GameListResponse {

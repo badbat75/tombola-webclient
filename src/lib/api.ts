@@ -117,6 +117,10 @@ class TombolaApiClient {
     });
   }
 
+  async getGameStatus(gameId: string): Promise<GameStatus> {
+    return this.request<GameStatus>(`/${gameId}/status`);
+  }
+
   // Client Registration (Game-specific)
   async register(name: string, clientType: 'player' | 'admin' | 'viewer' = 'player', nocard?: number): Promise<RegistrationResponse> {
     if (!this.gameId) {

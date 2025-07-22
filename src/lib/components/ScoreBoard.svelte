@@ -1,6 +1,7 @@
 <script lang="ts">
   import { gameState } from '$lib/gameStore.svelte.js';
   import { tombolaApi } from '$lib/api.js';
+  import { getScoreText, getScoreColor, isBingo, isMajorAchievement } from '../scoreUtils.js';
 
   // Derived value for score achievements with client names
   const achievementsWithNames = $derived(async () => {
@@ -49,28 +50,6 @@
       return [];
     }
   });
-
-  const getScoreDescription = (score: number): string => {
-    switch (score) {
-      case 2: return '2 in a line';
-      case 3: return '3 in a line';
-      case 4: return '4 in a line';
-      case 5: return '5 in a line (Full line)';
-      case 15: return 'BINGO!';
-      default: return `${score} numbers`;
-    }
-  };
-
-  const getScoreEmoji = (score: number): string => {
-    switch (score) {
-      case 2: return '🎯';
-      case 3: return '🎪';
-      case 4: return '🌟';
-      case 5: return '🏆';
-      case 15: return '🎉';
-      default: return '🎮';
-    }
-  };
 </script>
 
 <div class="scoreboard">
@@ -84,18 +63,18 @@
   {:else}
     <div class="published-score">
       <span class="label">Highest Achievement:</span>
-      <span class="value">{getScoreDescription(gameState.scoreCard.published_score)} {getScoreEmoji(gameState.scoreCard.published_score)}</span>
+      <span class="value" style="color: {getScoreColor(gameState.scoreCard.published_score)}">{getScoreText(gameState.scoreCard.published_score)}</span>
     </div>
 
     {#await achievementsWithNames() then achievements}
       {#if achievements.length > 0}
         <div class="achievements-list">
           {#each achievements as achievement (achievement.clientName + achievement.cardId + achievement.score)}
-            <div class="achievement-item" class:bingo={achievement.score === 15}>
+            <div class="achievement-item" class:bingo={isBingo(achievement.score)} class:major={isMajorAchievement(achievement.score)}>
               <div class="achievement-header">
                 <span class="player-name">{achievement.clientName}</span>
-                <span class="score-badge" class:bingo-badge={achievement.score === 15}>
-                  {getScoreEmoji(achievement.score)} {getScoreDescription(achievement.score)}
+                <span class="score-badge" style="color: {getScoreColor(achievement.score)}">
+                  {getScoreText(achievement.score)}
                 </span>
               </div>
               <div class="achievement-details">
@@ -194,6 +173,11 @@
     animation: gentle-pulse 2s ease-in-out infinite;
   }
 
+  .achievement-item.major {
+    border-left: 4px solid #ff9800;
+    background: linear-gradient(to right, #fff3e0, #ffffff);
+  }
+
   @keyframes gentle-pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.02); }
@@ -219,11 +203,6 @@
     border-radius: 12px;
     font-size: 0.9em;
     font-weight: bold;
-  }
-
-  .score-badge.bingo-badge {
-    background: #ff1744;
-    animation: pulse 1s ease-in-out infinite;
   }
 
   .achievement-details {

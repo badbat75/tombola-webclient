@@ -93,6 +93,25 @@ export const gameActions = {
     }
   },
 
+  async registerAsBoard(): Promise<boolean> {
+    try {
+      // Board clients use special client ID and don't need to register through API
+      const boardClientId = "0000000000000000";
+      gameState.clientId = boardClientId;
+      gameState.playerName = "Board";
+      gameState.isRegistered = true;
+      gameState.error = null;
+
+      // Set the board client ID in the API client
+      tombolaApi.setClientId(boardClientId);
+
+      return true;
+    } catch (error) {
+      gameState.error = error instanceof Error ? error.message : 'Board registration failed';
+      return false;
+    }
+  },
+
   async loadCards(): Promise<void> {
     if (!gameState.isRegistered) return;
 

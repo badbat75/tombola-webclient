@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { tombolaApi } from '../api.js';
-  import type { GameInfo } from '../types.js';
+  import type { GameInfo, GameStatus } from '../types.js';
+  import { getScoreText, getScoreColor } from '../scoreUtils.js';
 
   interface Props {
     onGameSelected: (gameId: string) => void;
@@ -10,6 +11,7 @@
   let { onGameSelected }: Props = $props();
 
   let games: GameInfo[] = $state([]);
+  let gameDetails = $state<Map<string, GameStatus>>(new Map());
   let gameStats = $state<any>(null);
   let loading = $state(true);
   let creating = $state(false);
@@ -26,11 +28,31 @@
       const response = await tombolaApi.getGamesList();
       games = response.games;
       gameStats = response.statistics;
+
+      // Load detailed status for each game
+      await loadGameDetails();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load games';
     } finally {
       loading = false;
     }
+  }
+
+  async function loadGameDetails() {
+    const detailsMap = new Map<string, GameStatus>();
+
+    // Load detailed status for each game in parallel
+    const statusPromises = games.map(async (game) => {
+      try {
+        const status = await tombolaApi.getGameStatus(game.game_id);
+        detailsMap.set(game.game_id, status);
+      } catch (err) {
+        console.warn(`Failed to load details for game ${game.game_id}:`, err);
+      }
+    });
+
+    await Promise.all(statusPromises);
+    gameDetails = detailsMap;
   }
 
   function selectGame(gameId: string) {
@@ -60,7 +82,7 @@
     switch (status.toLowerCase()) {
       case 'new': return '#4a90e2';
       case 'active': return '#28a745';
-      case 'completed': return '#6c757d';
+      case 'closed': return '#6c757d';
       default: return '#6c757d';
     }
   }
@@ -69,9 +91,17 @@
     switch (status.toLowerCase()) {
       case 'new': return '🆕';
       case 'active': return '🎯';
-      case 'completed': return '✅';
+      case 'closed': return '✅';
       default: return '❓';
     }
+  }
+
+  function getProgressPercentage(numbersExtracted: number): number {
+    return Math.round((numbersExtracted / 90) * 100);
+  }
+
+  function getGameDetail(gameId: string): GameStatus | null {
+    return gameDetails.get(gameId) || null;
   }
 
   function formatDate(dateStr: string): string {
@@ -105,9 +135,10 @@
     <div class="header-actions">
       {#if gameStats}
         <div class="stats">
-          <span class="stat">Total: {gameStats.active_games + gameStats.new_games + gameStats.closed_games}</span>
-          <span class="stat">Active: {gameStats.active_games}</span>
-          <span class="stat">New: {gameStats.new_games}</span>
+          <span class="stat total">📊 Total: {gameStats.active_games + gameStats.new_games + gameStats.closed_games}</span>
+          <span class="stat new">🆕 New: {gameStats.new_games}</span>
+          <span class="stat active">🎯 Active: {gameStats.active_games}</span>
+          <span class="stat closed">✅ Closed: {gameStats.closed_games}</span>
         </div>
       {/if}
       <button class="create-btn" onclick={createNewGame} disabled={creating || loading}>
@@ -141,6 +172,7 @@
   {:else}
     <div class="games-grid">
       {#each games as game (game.game_id)}
+        {@const detail = getGameDetail(game.game_id)}
         <div
           class="game-card"
           onclick={() => selectGame(game.game_id)}
@@ -160,10 +192,41 @@
               <span class="label">Created:</span>
               <span class="value">{formatDate(game.start_date)}</span>
             </div>
-            <div class="info-row">
-              <span class="label">Status:</span>
-              <span class="value">{game.status || 'Unknown'}</span>
-            </div>
+            {#if detail}
+              <div class="info-row">
+                <span class="label">Players:</span>
+                <span class="value">👥 {detail.players}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Cards:</span>
+                <span class="value">🎯 {detail.cards}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Numbers:</span>
+                <span class="value">🔢 {detail.numbers_extracted}/90</span>
+              </div>
+              {#if detail.numbers_extracted > 0}
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: {getProgressPercentage(detail.numbers_extracted)}%"></div>
+                  <span class="progress-text">{getProgressPercentage(detail.numbers_extracted)}% complete</span>
+                </div>
+              {/if}
+              {#if detail.scorecard > 0}
+                <div class="info-row">
+                  <span class="label">Best Score:</span>
+                  <span class="value" style="color: {getScoreColor(detail.scorecard)}">{getScoreText(detail.scorecard)}</span>
+                </div>
+              {/if}
+            {:else}
+              <div class="info-row">
+                <span class="label">Players:</span>
+                <span class="value">👥 {game.client_count || 0}</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Numbers:</span>
+                <span class="value">🔢 {game.extracted_numbers || 0}/90</span>
+              </div>
+            {/if}
             {#if game.close_date}
               <div class="info-row">
                 <span class="label">Closed:</span>
@@ -173,7 +236,7 @@
           </div>
 
           <button class="select-btn">
-            Select Game
+            {game.status === 'new' ? 'Join Game' : game.status === 'active' ? 'Join Active Game' : 'View Game'}
           </button>
         </div>
       {/each}
@@ -214,6 +277,7 @@
     display: flex;
     gap: 12px;
     font-size: 0.9em;
+    flex-wrap: wrap;
   }
 
   .stat {
@@ -222,6 +286,26 @@
     border-radius: 4px;
     color: #495057;
     font-weight: 500;
+  }
+
+  .stat.total {
+    background: #e3f2fd;
+    color: #1565c0;
+  }
+
+  .stat.new {
+    background: #e8f5e8;
+    color: #2e7d32;
+  }
+
+  .stat.active {
+    background: #fff3e0;
+    color: #ef6c00;
+  }
+
+  .stat.closed {
+    background: #f3e5f5;
+    color: #7b1fa2;
   }
 
   .refresh-btn {
@@ -329,7 +413,7 @@
 
   .games-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 20px;
     margin-bottom: 24px;
   }
@@ -342,6 +426,9 @@
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
   }
 
   .game-card:hover {
@@ -378,12 +465,14 @@
 
   .game-info {
     margin-bottom: 16px;
+    flex-grow: 1;
   }
 
   .info-row {
     display: flex;
     justify-content: space-between;
     margin-bottom: 6px;
+    align-items: center;
   }
 
   .label {
@@ -394,6 +483,33 @@
   .value {
     color: #333;
     font-weight: bold;
+  }
+
+  .progress-bar {
+    position: relative;
+    background: #e9ecef;
+    border-radius: 8px;
+    height: 20px;
+    margin: 8px 0;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    background: linear-gradient(90deg, #28a745, #20c997);
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #333;
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
   }
 
   .select-btn {
@@ -407,6 +523,7 @@
     font-weight: bold;
     cursor: pointer;
     transition: background 0.2s ease;
+    margin-top: auto;
   }
 
   .select-btn:hover {
