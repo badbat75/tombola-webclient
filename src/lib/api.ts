@@ -13,15 +13,17 @@ import type {
   GameInfo,
   NewGameResponse
 } from './types.js';
+import { authStore } from './stores/auth.js';
+import { get } from 'svelte/store';
 
 // Build API base URL from environment variables
-const API_HOST = import.meta.env.VITE_API_HOST || '127.0.0.1';
-const API_PORT = import.meta.env.VITE_API_PORT || '3000';
-const API_PROTOCOL = import.meta.env.VITE_API_PROTOCOL || 'http';
+const API_HOST = import.meta.env.API_HOST || '127.0.0.1';
+const API_PORT = import.meta.env.API_PORT || '3000';
+const API_PROTOCOL = import.meta.env.API_PROTOCOL || 'http';
 const API_BASE_URL = `${API_PROTOCOL}://${API_HOST}:${API_PORT}`;
 
 // Debug logging helper
-const DEBUG_MODE = import.meta.env.VITE_DEBUG_MODE === 'true';
+const DEBUG_MODE = import.meta.env.DEBUG_MODE === 'true';
 const debugLog = (message: string, data?: any) => {
   if (DEBUG_MODE) {
     console.log(`[Tombola API] ${message}`, data || '');
@@ -65,6 +67,13 @@ class TombolaApiClient {
       'Content-Type': 'application/json',
       ...((options.headers as Record<string, string>) || {})
     };
+
+    // Add JWT token if authenticated
+    const authState = get(authStore);
+    if (authState.state === 'authenticated' && authState.token) {
+      headers['Authorization'] = `Bearer ${authState.token}`;
+      debugLog('Added JWT token to request headers');
+    }
 
     if (this.clientId && !headers['X-Client-ID']) {
       headers['X-Client-ID'] = this.clientId;

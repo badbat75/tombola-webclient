@@ -4,6 +4,19 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 
 ## 🎯 Features
 
+### 🔐 Advanced Authentication System
+- 🪄 **Magic Link Authentication**: Passwordless login via email (no passwords required)
+- 🔒 **Server-Side JWT Validation**: Secure route protection with server-side token verification
+- 👤 **User Identity**: Display authenticated user's name or email in the header
+- 🔄 **Persistent Sessions**: Automatic token storage and validation across browser sessions
+- 📧 **Email-based Flow**: Simple authentication workflow using magic links sent to email
+- ⚡ **Real-time Auth State**: Dynamic UI that adapts based on authentication status
+- 🚀 **Supabase Integration**: Direct REST API integration with Supabase authentication (no SDK required)
+- �️ **Route Protection**: `/player` and `/board` routes protected when authentication is enabled
+- 🍪 **Cookie-based Sessions**: JWT tokens stored in HTTP cookies for server-side validation
+- 🔀 **Optional Authentication**: System works seamlessly with auth enabled or completely disabled
+- 🚫 **Client-Side Security**: No sensitive credentials exposed to browser (server-side only)
+
 ### Multi-Game Architecture Support
 - 🎮 **Game Discovery**: Browse available games with detailed status information
 - ✨ **Game Creation**: Create new games directly from the web interface
@@ -42,17 +55,77 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 - Node.js 18+ and npm
 - Rust Tombola API Server running on `localhost:3000` with multi-game support
 
-### 1. Configure Server Connection (Optional)
-Copy the example configuration file and customize if needed:
+### 1. Configure Server Connection and Authentication
+
+#### Server-Side Authentication Configuration
+Copy the example configuration file and customize for your environment:
 ```bash
 copy .env.example .env
 ```
 
-Edit `.env` to match your server setup:
+Update the `.env` file with your server configuration:
 ```env
-VITE_API_HOST=127.0.0.1
-VITE_API_PORT=3000
-VITE_API_PROTOCOL=http
+# Server endpoint configuration
+API_HOST=127.0.0.1
+API_PORT=3000
+API_PROTOCOL=http
+
+# Optional: Enable debug logging
+DEBUG_MODE=false
+
+# Supabase Configuration (for authentication)
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+#### Authentication Modes
+
+**🔒 With Authentication (Default)**
+- Uncomment the Supabase configuration lines
+- `/player` and `/board` routes require valid JWT tokens
+- Server-side validation protects all protected routes
+- Magic link authentication via email
+
+**🚪 Without Authentication (Optional)**
+- Comment out or remove `SUPABASE_URL` and `SUPABASE_ANON_KEY`
+- All routes become publicly accessible
+- No login required
+- Perfect for local development or public instances
+
+```env
+# To disable authentication, comment out these lines:
+#SUPABASE_URL=https://your-project-ref.supabase.co
+#SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+**🔐 Security Features:**
+- 🛡️ Server-side JWT token validation for protected routes
+- 🍪 HTTP-only cookies for secure session management
+- 🚫 No sensitive credentials exposed to browser
+- ⚡ Automatic token refresh and validation
+- 🔀 Graceful degradation when authentication is disabled
+**🚀 Authentication Features:**
+- ✅ Magic link authentication (passwordless)
+- ✅ JWT token management with automatic refresh
+- ✅ User profile access
+- ✅ Session management with HTTP-only cookies
+- ✅ Server-side route protection
+- ✅ Direct REST API calls (no Supabase SDK required)
+- ✅ Complete client-side credential isolation
+
+**🛡️ Route Protection:**
+When authentication is enabled, the following routes require valid JWT tokens:
+- `/player?gameId={game_id}` - Protected for authenticated card players
+- `/board?gameId={game_id}` - Protected for authenticated board operators
+- `/` - Always accessible (handles authentication flow)
+
+When authentication is disabled, all routes are publicly accessible.
+
+Edit the API configuration to match your game server setup:
+```env
+API_HOST=127.0.0.1
+API_PORT=3000
+API_PROTOCOL=http
 ```
 
 For detailed configuration options, see [CONFIG.md](CONFIG.md).
@@ -201,10 +274,164 @@ The web client communicates with the Rust Tombola API server through RESTful end
 - `GET /{game_id}/listassignedcards` - List client's assigned cards
 - `GET /{game_id}/getassignedcard/{card_id}` - Get specific card details
 
-### Authentication
-- Uses `X-Client-ID` header for authenticated endpoints
-- Board operators use special client ID `"0000000000000000"`
-- Player clients receive dynamically generated 16-character hex IDs
+## 🔐 Authentication System
+
+The Tombola Web Client implements a **comprehensive server-side authentication system** with optional Supabase integration. The system is designed with security as a priority, featuring server-side JWT validation and zero client-side credential exposure.
+
+### Architecture Overview
+
+#### 🛡️ Security-First Design
+- **Server-Side Rendering (SSR)**: All authentication checks happen server-side
+- **JWT Token Validation**: Tokens validated against Supabase on every protected route access
+- **HTTP-Only Cookies**: Session tokens stored securely, inaccessible to JavaScript
+- **Zero Client Exposure**: No authentication credentials or configuration exposed to the browser
+- **Route Protection**: Server-side enforcement for `/player` and `/board` routes when authentication is enabled
+
+#### 🔄 Authentication Flow
+1. **Email Input**: User enters email on landing page (server-rendered form)
+2. **Magic Link**: Server sends magic link via Supabase API
+3. **Token Verification**: Magic link processed server-side with JWT validation
+4. **Session Creation**: Valid tokens stored in HTTP-only cookies
+5. **Route Access**: Protected routes validate JWT server-side before rendering
+
+#### 🎯 Dual Identity System
+The system maintains two separate identity concepts:
+
+**🔐 User Authentication (JWT)**
+- **Purpose**: User identity and session management
+- **Implementation**: Server-side JWT validation with Supabase
+- **Scope**: Controls access to protected routes when authentication is enabled
+- **Storage**: HTTP-only cookies for security
+
+**🎮 Game Client ID**
+- **Purpose**: Game participation and state tracking
+- **Implementation**: Dynamic 16-character hex IDs for players, fixed ID for board operators
+- **Scope**: Game-specific registration and API communication
+- **Storage**: Client-side for game functionality
+
+### Configuration Options
+
+#### Optional Authentication
+Authentication can be completely disabled by omitting Supabase configuration:
+
+```env
+# Authentication disabled - all routes accessible
+# (no SUPABASE_ variables configured)
+```
+
+#### Supabase Authentication
+```env
+# Required for authentication
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Optional - public key for client-side features (if needed)
+PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+### Server-Side Implementation
+
+#### Protected Route Enforcement
+Routes `/player` and `/board` include server-side JWT validation:
+
+```typescript
+// src/routes/player/+page.server.ts
+export async function load({ cookies, url }) {
+    // Check if authentication is enabled
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+        const token = cookies.get('sb-access-token');
+
+        // Validate JWT with Supabase
+        const user = await getSupabaseUser(token);
+        if (!user) {
+            throw redirect(302, '/');
+        }
+
+        return { user };
+    }
+    // Authentication disabled - allow access
+    return {};
+}
+```
+
+#### Magic Link Processing
+Server handles magic link verification and cookie management:
+
+```typescript
+// src/routes/api/auth/verify/+server.ts
+export async function GET({ url, cookies }) {
+    const accessToken = url.searchParams.get('access_token');
+
+    // Validate token with Supabase
+    const user = await getSupabaseUser(accessToken);
+    if (user) {
+        // Set secure HTTP-only cookie
+        cookies.set('sb-access-token', accessToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 60 * 60 * 24 * 7 // 7 days
+        });
+    }
+
+    throw redirect(302, '/');
+}
+```
+
+### Security Features
+
+#### Client-Side Protection
+- **No Credential Exposure**: Vite configuration prevents leaking `SUPABASE_` environment variables
+- **Cookie-Only Auth**: Authentication state synchronized via HTTP-only cookies
+- **Dynamic Configuration**: Server dynamically imports credentials, never exposing them to the client
+
+#### Server-Side Validation
+- **Every Request**: JWT validation on all protected route accesses
+- **Supabase Integration**: Direct validation against Supabase auth API
+- **Automatic Redirects**: Unauthenticated users redirected to login page
+- **Session Management**: Secure cookie handling with proper expiration
+
+### API Integration
+
+When authentication is enabled, the system integrates with the Tombola API server using dual headers:
+
+```typescript
+// Authenticated API request
+headers: {
+    'Authorization': `Bearer ${jwtToken}`,     // User authentication
+    'X-Client-ID': clientId                   // Game participation
+}
+```
+
+### Development and Testing
+
+#### Testing Without Authentication
+```bash
+# Disable authentication by removing/commenting Supabase config
+# SUPABASE_URL=...
+# SUPABASE_SERVICE_ROLE_KEY=...
+
+npm run dev  # All routes accessible without authentication
+```
+
+#### Testing With Authentication
+```bash
+# Enable authentication with proper Supabase configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+npm run dev  # Routes protected, magic link authentication required
+```
+
+### Benefits
+
+- **🛡️ Security**: Server-side validation prevents client-side authentication bypass
+- **🔒 Privacy**: Zero credential exposure to browser or client-side code
+- **⚡ Performance**: Efficient JWT validation with proper caching
+- **🔧 Flexibility**: Optional authentication system - can be completely disabled
+- **📱 UX**: Seamless magic link flow with automatic redirects
+- **🎯 Separation**: Clean separation between user identity and game participation
 
 ## 🎨 Customization
 

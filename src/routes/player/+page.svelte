@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
+  import { authStore } from '$lib/stores/auth.js';
   import { gameState, gameActions } from '$lib/gameStore.svelte.js';
   import Card from '$lib/components/Card.svelte';
   import Board from '$lib/components/Board.svelte';
@@ -9,25 +10,47 @@
   import LeaderboardSidebar from '$lib/components/LeaderboardSidebar.svelte';
   import ScoreBoard from '$lib/components/ScoreBoard.svelte';
 
+  // Get server-side auth configuration
+  let { data } = $props();
+  const { authEnabled } = data;
+
   let playerName = $state('');
   let cardCount = $state(6);
   let isConnecting = $state(false);
   let isRegistering = $state(false);
   let gameIdSet = $state(false);
 
-  // Watch for registration state changes to auto-fill name
+  // Redirect if user signs out (but only if auth is enabled)
+  $effect(() => {
+    // Only redirect on signout if authentication is enabled server-side
+    if (authEnabled && $authStore.state === 'unauthenticated' && gameIdSet) {
+      alert('You have been signed out. Redirecting to home page.');
+      goto('/');
+    }
+  });
+
+  // Auto-fill player name based on authentication status
   $effect(() => {
     if (!gameState.isRegistered && !playerName) {
-      // Auto-fill from previous session if available
-      const previousName = gameActions.getPreviousPlayerName();
-      if (previousName) {
-        playerName = previousName;
+      // Priority 1: Use authenticated user's name or email (if auth is enabled and user is authenticated)
+      if ($authStore.state === 'authenticated' && $authStore.user?.name) {
+        playerName = $authStore.user.name;
+      } else if ($authStore.state === 'authenticated' && $authStore.user?.email) {
+        // Use the part before @ if no name is available
+        playerName = $authStore.user.email.split('@')[0];
+      } else {
+        // Priority 2: Fallback to previous session name (always available, regardless of auth state)
+        const previousName = gameActions.getPreviousPlayerName();
+        if (previousName) {
+          playerName = previousName;
+        }
       }
     }
   });
 
   // Try to connect on mount
   onMount(async () => {
+    // Allow access without authentication - let server handle auth requirements
     // Check for gameId in URL parameters or localStorage
     const urlGameId = $page.url.searchParams.get('gameId');
     const storedGameId = localStorage.getItem('tombola-game-id');
@@ -78,26 +101,16 @@
     gameActions.clearError();
 
     isRegistering = true;
-    await gameActions.register(playerName.trim(), cardCount);
+
+    // Use default card count (6) for re-registrations, otherwise use selected count
+    const finalCardCount = gameActions.getPreviousPlayerName() ? 6 : cardCount;
+
+    await gameActions.register(playerName.trim(), finalCardCount);
     isRegistering = false;
   }
 </script>
 
 <div class="app">
-  <header class="app-header">
-    <div class="header-content">
-      <div class="header-left">
-        <h1>🎯 Tombola Player</h1>
-        <p class="subtitle">Card Player Interface</p>
-      </div>
-      {#if gameState.isRegistered}
-        <div class="header-right">
-          <div class="player-name-display">{gameState.playerName}</div>
-        </div>
-      {/if}
-    </div>
-  </header>
-
   <main class="app-main">
     <!-- Connection Section -->
     {#if !gameState.isConnected}
@@ -138,19 +151,27 @@
               disabled={isRegistering}
             />
           </div>
-          <div class="form-group">
-            <label for="cardCount">Number of Cards (1-6):</label>
-            <input
-              type="number"
-              id="cardCount"
-              bind:value={cardCount}
-              min="1"
-              max="6"
-              disabled={isRegistering}
-            />
-          </div>
+          {#if !gameActions.getPreviousPlayerName()}
+            <div class="form-group">
+              <label for="cardCount">Number of Cards (1-6):</label>
+              <input
+                type="number"
+                id="cardCount"
+                bind:value={cardCount}
+                min="1"
+                max="6"
+                disabled={isRegistering}
+              />
+            </div>
+          {/if}
           <button onclick={handleRegister} disabled={isRegistering} class="primary-button">
-            {isRegistering ? 'Registering...' : 'Register & Generate Cards'}
+            {#if isRegistering}
+              Registering...
+            {:else if gameActions.getPreviousPlayerName()}
+              Join New Game
+            {:else}
+              Register & Generate Cards
+            {/if}
           </button>
         </div>
       {:else}
@@ -208,56 +229,6 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-  }
-
-  .app-header {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
-    gap: 20px;
-  }
-
-  .header-left {
-    text-align: left;
-    flex: 1;
-  }
-
-  .header-right {
-    text-align: right;
-    flex: 1;
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  .header-left h1 {
-    margin: 0;
-    color: #333;
-    font-size: 2.5em;
-  }
-
-  .subtitle {
-    margin: 5px 0 0 0;
-    color: #666;
-    font-size: 1.1em;
-    font-weight: 500;
-  }
-
-  .player-name-display {
-    font-weight: bold;
-    color: #1976d2;
-    font-size: 1.1em;
-    padding: 8px 16px;
-    background: #e3f2fd;
-    border: 1px solid #bbdefb;
-    border-radius: 20px;
   }
 
   .app-main {
@@ -453,14 +424,6 @@
   }
 
   @media (max-width: 768px) {
-    .app-header h1 {
-      font-size: 2em;
-    }
-
-    .subtitle {
-      font-size: 1em;
-    }
-
     .app-main {
       padding: 16px;
     }
@@ -468,16 +431,6 @@
     .connection-section,
     .registration-section {
       padding: 24px 16px;
-    }
-
-    .header-content {
-      flex-direction: column;
-      gap: 12px;
-      text-align: center;
-    }
-
-    .header-right {
-      text-align: center;
     }
 
     .main-content {

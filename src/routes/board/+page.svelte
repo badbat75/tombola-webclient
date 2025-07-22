@@ -2,17 +2,31 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
+  import { authStore } from '$lib/stores/auth.js';
   import { gameState, gameActions } from '$lib/gameStore.svelte.js';
   import Board from '$lib/components/Board.svelte';
   import GameFooter from '$lib/components/GameFooter.svelte';
   import LeaderboardSidebar from '$lib/components/LeaderboardSidebar.svelte';
   import { tombolaApi } from '$lib/api.js';
 
+  // Get server-side auth configuration
+  let { data } = $props();
+  const { authEnabled } = data;
+
   let isConnecting = $state(false);
   let isRegistering = $state(false);
   let isExtracting = $state(false);
   let lastExtractionResult = $state<string | null>(null);
   let gameIdSet = $state(false);
+
+  // Redirect if user signs out (but only if auth is enabled)
+  $effect(() => {
+    // Only redirect on signout if authentication is enabled server-side
+    if (authEnabled && $authStore.state === 'unauthenticated' && gameIdSet) {
+      alert('You have been signed out. Redirecting to home page.');
+      goto('/');
+    }
+  });
 
   // Auto re-register board viewer when connection is restored or game changes
   $effect(() => {
@@ -28,6 +42,7 @@
 
   // Try to connect on mount
   onMount(async () => {
+    // Allow access without authentication - let server handle auth requirements
     // Check for gameId in URL parameters or localStorage
     const urlGameId = $page.url.searchParams.get('gameId');
     const storedGameId = localStorage.getItem('tombola-game-id');
@@ -102,18 +117,6 @@
 </script>
 
 <div class="app">
-  <header class="app-header">
-    <div class="header-content">
-      <div class="header-left">
-        <h1>🎯 Tombola Board</h1>
-        <p class="subtitle">Board Operator Interface</p>
-      </div>
-      <div class="header-right">
-        <div class="board-name-display">Board</div>
-      </div>
-    </div>
-  </header>
-
   <main class="app-main">
     <!-- Connection Section -->
     {#if !gameState.isConnected}
@@ -188,56 +191,6 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-  }
-
-  .app-header {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 20px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    max-width: 1400px;
-    margin: 0 auto;
-    gap: 20px;
-  }
-
-  .header-left {
-    text-align: left;
-    flex: 1;
-  }
-
-  .header-right {
-    text-align: right;
-    flex: 1;
-    display: flex;
-    justify-content: flex-end;
-  }
-
-  .header-left h1 {
-    margin: 0;
-    color: #333;
-    font-size: 2.5em;
-  }
-
-  .subtitle {
-    margin: 5px 0 0 0;
-    color: #666;
-    font-size: 1.1em;
-    font-weight: 500;
-  }
-
-  .board-name-display {
-    font-weight: bold;
-    color: #1976d2;
-    font-size: 1.1em;
-    padding: 8px 16px;
-    background: #e3f2fd;
-    border: 1px solid #bbdefb;
-    border-radius: 20px;
   }
 
   .app-main {
@@ -404,10 +357,6 @@
   }
 
   @media (max-width: 768px) {
-    .app-header h1 {
-      font-size: 2em;
-    }
-
     .app-main {
       padding: 16px;
     }
@@ -418,16 +367,6 @@
 
     .control-panel {
       padding: 16px;
-    }
-
-    .header-content {
-      flex-direction: column;
-      gap: 12px;
-      text-align: center;
-    }
-
-    .header-right {
-      text-align: center;
     }
   }
 </style>

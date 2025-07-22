@@ -6,9 +6,11 @@
 
   interface Props {
     onGameSelected: (gameId: string) => void;
+    readonly?: boolean;
+    authEnabled?: boolean;
   }
 
-  let { onGameSelected }: Props = $props();
+  let { onGameSelected, readonly = false, authEnabled = true }: Props = $props();
 
   let games: GameInfo[] = $state([]);
   let gameDetails = $state<Map<string, GameStatus>>(new Map());
@@ -141,9 +143,11 @@
           <span class="stat closed">✅ Closed: {gameStats.closed_games}</span>
         </div>
       {/if}
-      <button class="create-btn" onclick={createNewGame} disabled={creating || loading}>
-        {creating ? '🔄 Creating...' : '🆕 Create New Game'}
-      </button>
+      {#if !readonly}
+        <button class="create-btn" onclick={createNewGame} disabled={creating || loading}>
+          {creating ? '🔄 Creating...' : '🆕 Create New Game'}
+        </button>
+      {/if}
       <button class="refresh-btn" onclick={loadGames} disabled={loading}>
         {loading ? '🔄' : '↻'} Refresh
       </button>
@@ -164,10 +168,14 @@
   {:else if games.length === 0}
     <div class="no-games">
       <p>🎯 No games available</p>
-      <p>Create a new game to get started!</p>
-      <button class="create-game-primary" onclick={createNewGame} disabled={creating}>
-        {creating ? '🔄 Creating...' : '🆕 Create Your First Game'}
-      </button>
+      {#if readonly}
+        <p>Check back later for available games!</p>
+      {:else}
+        <p>Create a new game to get started!</p>
+        <button class="create-game-primary" onclick={createNewGame} disabled={creating}>
+          {creating ? '🔄 Creating...' : '🆕 Create Your First Game'}
+        </button>
+      {/if}
     </div>
   {:else}
     <div class="games-grid">
