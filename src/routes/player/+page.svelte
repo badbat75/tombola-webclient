@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
   import { gameState, gameActions } from '$lib/gameStore.svelte.js';
   import Card from '$lib/components/Card.svelte';
   import Board from '$lib/components/Board.svelte';
@@ -11,6 +13,7 @@
   let cardCount = $state(6);
   let isConnecting = $state(false);
   let isRegistering = $state(false);
+  let gameIdSet = $state(false);
 
   // Watch for registration state changes to auto-fill name
   $effect(() => {
@@ -25,6 +28,31 @@
 
   // Try to connect on mount
   onMount(async () => {
+    // Check for gameId in URL parameters or localStorage
+    const urlGameId = $page.url.searchParams.get('gameId');
+    const storedGameId = localStorage.getItem('tombola-game-id');
+    const gameId = urlGameId || storedGameId;
+
+    if (!gameId) {
+      // No game ID available, redirect to landing page
+      goto('/');
+      return;
+    }
+
+    // Set the game ID
+    const gameIdSuccess = await gameActions.setGameId(gameId);
+    if (!gameIdSuccess) {
+      goto('/');
+      return;
+    }
+
+    gameIdSet = true;
+
+    // Store game ID for future use
+    if (urlGameId) {
+      localStorage.setItem('tombola-game-id', urlGameId);
+    }
+
     await gameActions.connect();
     if (gameState.isConnected) {
       // Start auto-refresh
@@ -33,6 +61,8 @@
   });
 
   async function handleConnect() {
+    if (!gameIdSet) return;
+
     isConnecting = true;
     const success = await gameActions.connect();
     if (success) {

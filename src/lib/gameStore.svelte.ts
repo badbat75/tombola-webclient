@@ -12,28 +12,53 @@ const initialState: GameState = {
   pouch: { numbers: [] },
   scoreCard: { published_score: 0, score_map: {} },
   gameStatus: null,
+  gameId: null,
   error: null
 };
 
 // Store previous session data for re-registration
 let previousPlayerName = '';
-let currentGameId = '';
+
+// Client name cache - maps client_id to player name
+const clientNameCache = new Map<string, string>();
+
+// Sequential player numbering for board view (when names aren't available)
+const clientNumberCache = new Map<string, number>();
+let nextPlayerNumber = 1;
 
 // Create reactive state
 export const gameState = $state<GameState>({ ...initialState });
 
 // Game actions
 export const gameActions = {
+  async setGameId(gameId: string): Promise<boolean> {
+    try {
+      tombolaApi.setGameId(gameId);
+      gameState.gameId = gameId;
+      gameState.error = null;
+
+      // Clear client name cache when switching games
+      clientNameCache.clear();
+      clientNumberCache.clear();
+      nextPlayerNumber = 1;
+
+      return true;
+    } catch (error) {
+      gameState.error = error instanceof Error ? error.message : 'Failed to set game ID';
+      return false;
+    }
+  },
+
   async connect(): Promise<boolean> {
     try {
+      if (!gameState.gameId) {
+        throw new Error('Game ID must be set before connecting');
+      }
+
       const status = await tombolaApi.getStatus();
       gameState.gameStatus = status;
       gameState.isConnected = true;
       gameState.error = null;
-
-      // Set initial game ID
-      currentGameId = status.game_id;
-
       return true;
     } catch (error) {
       gameState.error = error instanceof Error ? error.message : 'Failed to connect';
@@ -52,6 +77,9 @@ export const gameActions = {
 
       // Store player name for future re-registration
       previousPlayerName = playerName;
+
+      // Cache the client name for leaderboard display
+      clientNameCache.set(response.client_id, playerName);
 
       tombolaApi.setClientId(response.client_id);
 
@@ -99,7 +127,7 @@ export const gameActions = {
   },
 
   async refreshGameState(): Promise<void> {
-    if (!gameState.isConnected) return;
+    if (!gameState.isConnected || !gameState.gameId) return;
 
     try {
       const [status, board, pouch, scoreCard] = await Promise.all([
@@ -109,17 +137,12 @@ export const gameActions = {
         tombolaApi.getScoreMap()
       ]);
 
-      // Check if game ID has changed (new game started)
-      if (currentGameId && status.game_id !== currentGameId) {
-        // Update current game ID first
-        currentGameId = status.game_id;
-        // Game has changed, need to re-register
+      // Check if we're still connected to the same game
+      if (status.game_id !== gameState.gameId) {
+        // Game ID mismatch, need to handle game change
         gameActions.handleGameChange(status);
         return;
       }
-
-      // Update current game ID
-      currentGameId = status.game_id;
 
       gameState.gameStatus = status;
       gameState.board = board;
@@ -169,7 +192,7 @@ export const gameActions = {
 
   reset(): void {
     Object.assign(gameState, { ...initialState });
-    currentGameId = '';
+    tombolaApi.setGameId('');
   },
 
   getPreviousPlayerName(): string {
@@ -322,5 +345,51 @@ export const gameUtils = {
     }
 
     return { score: maxScore, lines: allLines, bingo: hasBingo };
+  }
+};
+
+// Client name utilities
+export const clientUtils = {
+  // Get cached client name by ID
+  getClientName(clientId: string): string | null {
+    // Special case for board client
+    if (clientId === "0000000000000000") {
+      return "Board";
+    }
+
+    return clientNameCache.get(clientId) || null;
+  },
+
+  // Cache a client name
+  cacheClientName(clientId: string, name: string): void {
+    clientNameCache.set(clientId, name);
+  },
+
+  // Get display name with intelligent fallback
+  getDisplayName(clientId: string): string {
+    const cachedName = clientUtils.getClientName(clientId);
+    if (cachedName) {
+      return cachedName;
+    }
+
+    // For unknown players, assign sequential numbers for better UX
+    if (!clientNumberCache.has(clientId) && clientId !== "0000000000000000") {
+      clientNumberCache.set(clientId, nextPlayerNumber++);
+    }
+
+    const playerNumber = clientNumberCache.get(clientId);
+    if (playerNumber) {
+      return `Player ${playerNumber}`;
+    }
+
+    // Final fallback to shortened ID
+    return `Player ${clientId.slice(-4)}`;
+  },
+
+  // Clear cache (useful when switching games)
+  clearCache(): void {
+    clientNameCache.clear();
+    clientNumberCache.clear();
+    nextPlayerNumber = 1;
   }
 };

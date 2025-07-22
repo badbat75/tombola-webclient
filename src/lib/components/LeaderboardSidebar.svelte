@@ -1,62 +1,61 @@
 <script lang="ts">
-  import { gameState, gameUtils } from '$lib/gameStore.svelte.js';
+  import { gameState, gameUtils, clientUtils } from '$lib/gameStore.svelte.js';
   import { tombolaApi } from '$lib/api.js';
-  import type { Client } from '$lib/types.js';
 
   // Cache for resolved client names
-  let clientNameCache = $state<Map<string, string>>(new Map());
+  let resolvedNames = $state<Map<string, string>>(new Map());
   let resolvingClients = $state<Set<string>>(new Set());
 
-  // Function to resolve client ID to name
+  // Function to resolve client ID to name via API
   async function resolveClientName(clientId: string): Promise<void> {
-    // Skip board client - we handle this specially
-    if (clientId === "0000000000000000") {
-      return;
-    }
-
-    if (clientNameCache.has(clientId)) {
-      return;
-    }
-
-    if (resolvingClients.has(clientId)) {
+    // Skip board client and already resolved/resolving clients
+    if (clientId === "0000000000000000" ||
+        resolvedNames.has(clientId) ||
+        resolvingClients.has(clientId)) {
       return;
     }
 
     try {
       resolvingClients.add(clientId);
-      const client: Client = await tombolaApi.getClientById(clientId);
-      clientNameCache.set(clientId, client.name);
-      resolvingClients.delete(clientId);
+      const clientInfo = await tombolaApi.getClientById(clientId);
+      resolvedNames.set(clientId, clientInfo.name);
+      // Also update the main client cache
+      clientUtils.cacheClientName(clientId, clientInfo.name);
 
-      // Trigger reactive update by creating new Map
-      clientNameCache = new Map(clientNameCache);
+      // Trigger reactivity
+      resolvedNames = new Map(resolvedNames);
+      resolvingClients.delete(clientId);
     } catch (error) {
       resolvingClients.delete(clientId);
       console.warn(`Failed to resolve client name for ${clientId}:`, error);
-
-      // Cache the failure as a fallback name to avoid repeated API calls
-      const fallbackName = `Player ${clientId.slice(-8)}`;
-      clientNameCache.set(clientId, fallbackName);
-      clientNameCache = new Map(clientNameCache);
     }
   }
 
-  // Function to get display name for client
+  // Simple leaderboard data from scorecard
   function getClientDisplayName(clientId: string): string {
     // Special case for board client
     if (clientId === "0000000000000000") {
       return "Board";
     }
 
-    if (clientNameCache.has(clientId)) {
-      return clientNameCache.get(clientId)!;
+    // Check if we have a resolved name from API
+    if (resolvedNames.has(clientId)) {
+      return resolvedNames.get(clientId)!;
     }
 
+    // Check main cache (from registration)
+    const cachedName = clientUtils.getClientName(clientId);
+    if (cachedName && cachedName !== "Board") {
+      return cachedName;
+    }
+
+    // If we're currently resolving, show loading
     if (resolvingClients.has(clientId)) {
-      return `Loading...`;
+      return "Loading...";
     }
 
-    return `Player ${clientId.slice(-8)}`;
+    // Fallback: show descriptive ID while API resolution is attempted
+    return `Player ${clientId.slice(-6)}`;
   }
 
   // Get current player's stats
@@ -84,10 +83,12 @@
     return achievements.sort((a, b) => b.score - a.score).slice(0, 10);
   });
 
-  // Resolve client names for achievements
+  // Auto-resolve client names for achievements
   $effect(() => {
     topAchievements().forEach(achievement => {
-      if (!clientNameCache.has(achievement.clientId) && !resolvingClients.has(achievement.clientId)) {
+      if (achievement.clientId !== "0000000000000000" &&
+          !resolvedNames.has(achievement.clientId) &&
+          !resolvingClients.has(achievement.clientId)) {
         resolveClientName(achievement.clientId);
       }
     });

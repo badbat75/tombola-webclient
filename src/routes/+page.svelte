@@ -1,20 +1,32 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import GameSelector from '$lib/components/GameSelector.svelte';
+
+  let selectedGameId: string | null = $state(null);
+  let selectedMode: 'player' | 'board' | null = $state(null);
 
   // Check for any existing preferences
   onMount(() => {
     const lastMode = localStorage.getItem('tombola-mode');
+    const lastGameId = localStorage.getItem('tombola-game-id');
     // Don't auto-redirect, let user choose
   });
 
-  function selectMode(mode: 'player' | 'board') {
-    localStorage.setItem('tombola-mode', mode);
-    goto(`/${mode}`);
+  function onGameSelected(gameId: string) {
+    selectedGameId = gameId;
+    localStorage.setItem('tombola-game-id', gameId);
   }
-</script>
 
-<svelte:head>
+  function selectMode(mode: 'player' | 'board') {
+    if (!selectedGameId) return;
+
+    selectedMode = mode;
+    localStorage.setItem('tombola-mode', mode);
+    // Navigate to the selected mode with the game ID
+    goto(`/${mode}?gameId=${selectedGameId}`);
+  }
+</script><svelte:head>
   <title>Tombola Game - Choose Mode</title>
 </svelte:head>
 
@@ -27,65 +39,83 @@
   </header>
 
   <main class="app-main">
-    <div class="mode-selector">
-      <h2>Select Your Mode</h2>
+    <div class="combined-selector">
+      <div class="game-selection">
+        <h2>1. Choose a Game</h2>
 
-      <div class="mode-cards">
-        <div
-          class="mode-card player-card"
-          onclick={() => selectMode('player')}
-          onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectMode('player') : null}
-          role="button"
-          tabindex="0"
-          aria-label="Select Card Player mode"
-        >
-          <div class="mode-icon">🎴</div>
-          <h3>Card Player</h3>
-          <p>Play with your own bingo cards, mark numbers as they're called, and compete for prizes!</p>
-          <div class="features">
-            <span class="feature">• Generate up to 6 cards</span>
-            <span class="feature">• Real-time game updates</span>
-            <span class="feature">• Score tracking</span>
-            <span class="feature">• Leaderboard</span>
-          </div>
-          <button class="mode-button player-button">
-            Start Playing
-          </button>
-        </div>
-
-        <div
-          class="mode-card board-card"
-          onclick={() => selectMode('board')}
-          onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectMode('board') : null}
-          role="button"
-          tabindex="0"
-          aria-label="Select Board Operator mode"
-        >
-          <div class="mode-icon">🎯</div>
-          <h3>Board Operator</h3>
-          <p>Control the game flow, extract numbers, and manage the tombola session for all players.</p>
-          <div class="features">
-            <span class="feature">• Extract numbers</span>
-            <span class="feature">• Start new games</span>
-            <span class="feature">• Monitor all players</span>
-            <span class="feature">• Game statistics</span>
-          </div>
-          <button class="mode-button board-button">
-            Operate Board
-          </button>
-        </div>
+        <GameSelector
+          onGameSelected={onGameSelected}
+        />
       </div>
 
-      <div class="quick-links">
-        <p class="help-text">
-          <strong>New to Tombola?</strong> It's like Bingo! Numbers are drawn randomly,
-          and players mark them on their cards to win prizes.
-        </p>
-      </div>
+      {#if selectedGameId}
+        <div class="mode-selection">
+          <h2>2. Select Your Mode</h2>
+          <p class="game-info">Selected Game: <strong>{selectedGameId}</strong></p>
+
+          <div class="mode-cards">
+            <div
+              class="mode-card player-card"
+              onclick={() => selectMode('player')}
+              onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectMode('player') : null}
+              role="button"
+              tabindex="0"
+              aria-label="Select Card Player mode"
+            >
+              <div class="mode-icon">🎴</div>
+              <h3>Card Player</h3>
+              <p>Play with your own bingo cards, mark numbers as they're called, and compete for prizes!</p>
+              <div class="features">
+                <span class="feature">• Generate up to 6 cards</span>
+                <span class="feature">• Real-time game updates</span>
+                <span class="feature">• Score tracking</span>
+                <span class="feature">• Leaderboard</span>
+              </div>
+              <button class="mode-button player-button">
+                Join as Player
+              </button>
+            </div>
+
+            <div
+              class="mode-card board-card"
+              onclick={() => selectMode('board')}
+              onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectMode('board') : null}
+              role="button"
+              tabindex="0"
+              aria-label="Select Board Operator mode"
+            >
+              <div class="mode-icon">🎯</div>
+              <h3>Board Operator</h3>
+              <p>Control the game flow, extract numbers, and manage the tombola session for all players.</p>
+              <div class="features">
+                <span class="feature">• Extract numbers</span>
+                <span class="feature">• Monitor all players</span>
+                <span class="feature">• Game statistics</span>
+                <span class="feature">• Real-time updates</span>
+              </div>
+              <button class="mode-button board-button">
+                Operate Board
+              </button>
+            </div>
+          </div>
+
+          <div class="quick-links">
+            <p class="help-text">
+              <strong>New to Tombola?</strong> It's like Bingo! Numbers are drawn randomly,
+              and players mark them on their cards to win prizes.
+            </p>
+          </div>
+        </div>
+      {:else}
+        <div class="mode-selection disabled">
+          <h2>2. Select Your Mode</h2>
+          <div class="disabled-message">
+            <p>👆 Please choose a game first</p>
+          </div>
+        </div>
+      {/if}
     </div>
-  </main>
-
-  <footer class="app-footer">
+  </main>  <footer class="app-footer">
     <p>Tombola Web Client • Powered by Rust API Server</p>
   </footer>
 </div>
@@ -134,21 +164,71 @@
   .app-main {
     flex: 1;
     padding: 40px 20px;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
   }
 
-  .mode-selector {
+  .combined-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .mode-selection {
     text-align: center;
   }
 
-  .mode-selector h2 {
+  .mode-selection h2 {
     color: white;
     font-size: 2.2em;
     margin: 0 0 40px 0;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .game-selection h2 {
+    color: white;
+    font-size: 2.2em;
+    margin: 0 0 32px 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-align: center;
+  }
+
+  .mode-selection.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .game-info {
+    color: white;
+    text-align: center;
+    font-size: 1.1em;
+    margin-bottom: 24px;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .game-info strong {
+    color: #FFD700;
+    font-family: 'Courier New', monospace;
+  }
+
+  .disabled-message {
+    text-align: center;
+    padding: 60px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+  }
+
+  .disabled-message p {
+    color: white;
+    font-size: 1.3em;
+    margin: 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
 
   .mode-cards {
@@ -311,9 +391,14 @@
       padding: 20px 16px;
     }
 
-    .mode-selector h2 {
+    .mode-selection h2,
+    .game-selection h2 {
       font-size: 1.8em;
       margin-bottom: 30px;
+    }
+
+    .combined-selector {
+      gap: 30px;
     }
 
     .mode-cards {

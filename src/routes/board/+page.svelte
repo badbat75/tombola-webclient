@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
   import { gameState, gameActions } from '$lib/gameStore.svelte.js';
   import Board from '$lib/components/Board.svelte';
   import GameFooter from '$lib/components/GameFooter.svelte';
@@ -10,10 +12,11 @@
   let isRegistering = $state(false);
   let isExtracting = $state(false);
   let lastExtractionResult = $state<string | null>(null);
+  let gameIdSet = $state(false);
 
   // Auto re-register board viewer when connection is restored or game changes
   $effect(() => {
-    if (gameState.isConnected && !gameState.isRegistered && !isRegistering) {
+    if (gameState.isConnected && !gameState.isRegistered && !isRegistering && gameIdSet) {
       // Delay the re-registration slightly to avoid rapid successive calls
       setTimeout(() => {
         if (gameState.isConnected && !gameState.isRegistered && !isRegistering) {
@@ -25,6 +28,31 @@
 
   // Try to connect on mount
   onMount(async () => {
+    // Check for gameId in URL parameters or localStorage
+    const urlGameId = $page.url.searchParams.get('gameId');
+    const storedGameId = localStorage.getItem('tombola-game-id');
+    const gameId = urlGameId || storedGameId;
+
+    if (!gameId) {
+      // No game ID available, redirect to landing page
+      goto('/');
+      return;
+    }
+
+    // Set the game ID
+    const gameIdSuccess = await gameActions.setGameId(gameId);
+    if (!gameIdSuccess) {
+      goto('/');
+      return;
+    }
+
+    gameIdSet = true;
+
+    // Store game ID for future use
+    if (urlGameId) {
+      localStorage.setItem('tombola-game-id', urlGameId);
+    }
+
     await gameActions.connect();
     if (gameState.isConnected) {
       // Auto-register as board viewer
@@ -35,6 +63,8 @@
   });
 
   async function handleConnect() {
+    if (!gameIdSet) return;
+
     isConnecting = true;
     const success = await gameActions.connect();
     if (success) {
@@ -68,31 +98,6 @@
     }
 
     isExtracting = false;
-  }
-
-  async function handleNewGame() {
-    try {
-      await tombolaApi.newGame();
-      lastExtractionResult = 'New game started!';
-      await gameActions.refreshGameState();
-
-      // Re-register as board viewer if registration was lost due to game change
-      if (!gameState.isRegistered) {
-        await handleRegister();
-      }
-    } catch (error) {
-      lastExtractionResult = `Error: ${error instanceof Error ? error.message : 'Failed to start new game'}`;
-    }
-  }
-
-  async function handleDumpGame() {
-    try {
-      await tombolaApi.dumpGame();
-      lastExtractionResult = 'Game dumped!';
-      await gameActions.refreshGameState();
-    } catch (error) {
-      lastExtractionResult = `Error: ${error instanceof Error ? error.message : 'Failed to dump game'}`;
-    }
   }
 </script>
 
@@ -146,22 +151,6 @@
                   class="extract-button"
                 >
                   {isExtracting ? 'Extracting...' : 'Extract Number'}
-                </button>
-
-                <button
-                  onclick={handleNewGame}
-                  disabled={!gameState.isConnected}
-                  class="new-game-button"
-                >
-                  New Game
-                </button>
-
-                <button
-                  onclick={handleDumpGame}
-                  disabled={!gameState.isConnected}
-                  class="dump-game-button"
-                >
-                  Dump Game
                 </button>
               </div>
             </div>
@@ -315,40 +304,6 @@
 
   .extract-button:hover:not(:disabled) {
     background: #45a049;
-  }
-
-  .new-game-button {
-    background: #2196f3;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    min-width: 120px;
-  }
-
-  .new-game-button:hover:not(:disabled) {
-    background: #1976d2;
-  }
-
-  .dump-game-button {
-    background: #ff9800;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    min-width: 120px;
-  }
-
-  .dump-game-button:hover:not(:disabled) {
-    background: #f57c00;
   }
 
   button:disabled {
