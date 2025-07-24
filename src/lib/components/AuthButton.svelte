@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { authStore, auth } from '$lib/stores/auth.js';
 	import { authClient } from '$lib/auth-client.js';
 
@@ -13,6 +14,8 @@
 		if ($authStore.state === 'authenticated') {
 			// Sign out
 			auth.signOut();
+			// Navigate to home page
+			await goto('/');
 			return;
 		}
 

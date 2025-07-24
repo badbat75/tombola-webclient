@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
   import { authStore, auth } from '$lib/stores/auth.js';
+  import { userRegistrationStore } from '$lib/stores/userRegistration.js';
   import GameSelector from '$lib/components/GameSelector.svelte';
 
   // Get server-side auth configuration
@@ -13,6 +15,8 @@
 
   // Check for any existing preferences and magic link processing
   onMount(() => {
+    if (!browser) return;
+
     const lastMode = localStorage.getItem('tombola-mode');
     const lastGameId = localStorage.getItem('tombola-game-id');
 
@@ -148,104 +152,22 @@
 
     <div class="game-selection">
       <h2>Available Games</h2>
+
       {#if authEnabled}
         <p class="browse-note">🔒 Sign in to join any of these games</p>
         <GameSelector onGameSelected={onGameSelected} readonly authEnabled={authEnabled} />
       {:else}
-        <p class="browse-note">🎮 Choose any game to start playing</p>
-        <GameSelector onGameSelected={onGameSelected} authEnabled={authEnabled} />
+        {#if !$userRegistrationStore.isRegistered}
+          <p class="browse-note">📝 Register your name in the header to join games</p>
+        {/if}
+        <GameSelector
+          onGameSelected={onGameSelected}
+          authEnabled={authEnabled}
+          userRegistered={$userRegistrationStore.isRegistered}
+          userName={$userRegistrationStore.userName || ''}
+        />
       {/if}
     </div>
-
-    {#if selectedGameId}
-      <div class="mode-selection">
-        <h2>Game Modes</h2>
-        <p class="game-info">Selected Game: <strong>{selectedGameId}</strong></p>
-
-        {#if authEnabled}
-          <p class="auth-required">🔐 <strong>Authentication Required:</strong> Sign in to access game modes</p>
-
-          <div class="mode-cards disabled">
-            <div class="mode-card player-card disabled-card">
-              <div class="mode-icon">🎴</div>
-              <h3>Card Player</h3>
-              <p>Play with your own bingo cards, mark numbers as they're called, and compete for prizes!</p>
-              <div class="features">
-                <span class="feature">• Generate up to 6 cards</span>
-                <span class="feature">• Real-time game updates</span>
-                <span class="feature">• Score tracking</span>
-                <span class="feature">• Leaderboard</span>
-              </div>
-              <button class="mode-button player-button" disabled>
-                🔒 Sign In Required
-              </button>
-            </div>
-
-            <div class="mode-card board-card disabled-card">
-              <div class="mode-icon">🎯</div>
-              <h3>Board Operator</h3>
-              <p>Control the game by extracting numbers and managing the tombola board for all players!</p>
-              <div class="features">
-                <span class="feature">• Extract numbers</span>
-                <span class="feature">• View live leaderboard</span>
-                <span class="feature">• Large board display</span>
-                <span class="feature">• Game control</span>
-              </div>
-              <button class="mode-button board-button" disabled>
-                🔒 Sign In Required
-              </button>
-            </div>
-          </div>
-        {:else}
-          <!-- No auth required, show available modes -->
-          <div class="mode-cards">
-            <div
-              class="mode-card player-card"
-              onclick={() => selectMode('player')}
-              onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectMode('player') : null}
-              role="button"
-              tabindex="0"
-              aria-label="Select Card Player mode"
-            >
-              <div class="mode-icon">🎴</div>
-              <h3>Card Player</h3>
-              <p>Play with your own bingo cards, mark numbers as they're called, and compete for prizes!</p>
-              <div class="features">
-                <span class="feature">• Generate up to 6 cards</span>
-                <span class="feature">• Real-time game updates</span>
-                <span class="feature">• Score tracking</span>
-                <span class="feature">• Leaderboard</span>
-              </div>
-              <button class="mode-button player-button">
-                Join as Player
-              </button>
-            </div>
-
-            <div
-              class="mode-card board-card"
-              onclick={() => selectMode('board')}
-              onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectMode('board') : null}
-              role="button"
-              tabindex="0"
-              aria-label="Select Board Operator mode"
-            >
-              <div class="mode-icon">🎯</div>
-              <h3>Board Operator</h3>
-              <p>Control the game flow, extract numbers, and manage the tombola session for all players.</p>
-              <div class="features">
-                <span class="feature">• Extract numbers</span>
-                <span class="feature">• Monitor all players</span>
-                <span class="feature">• Game statistics</span>
-                <span class="feature">• Real-time updates</span>
-              </div>
-              <button class="mode-button board-button">
-                Operate Board
-              </button>
-            </div>
-          </div>
-        {/if}
-      </div>
-    {/if}
   </div>
 {:else if authEnabled && ($authStore.state === 'loading' || $authStore.state === 'magic-link-processing')}
   <div class="welcome-section">
@@ -263,78 +185,11 @@
     </div>
   </div>
 
-  <div class="combined-selector">
+    <div class="combined-selector">
     <div class="game-selection">
-      <h2>1. Choose a Game</h2>
+      <h2>Choose a Game</h2>
       <GameSelector onGameSelected={onGameSelected} authEnabled={authEnabled} />
     </div>
-
-    {#if selectedGameId}
-      <div class="mode-selection">
-        <h2>2. Select Your Mode</h2>
-        <p class="game-info">Selected Game: <strong>{selectedGameId}</strong></p>
-
-        <div class="mode-cards">
-          <div
-            class="mode-card player-card"
-            onclick={() => selectMode('player')}
-            onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectMode('player') : null}
-            role="button"
-            tabindex="0"
-            aria-label="Select Card Player mode"
-          >
-            <div class="mode-icon">🎴</div>
-            <h3>Card Player</h3>
-            <p>Play with your own bingo cards, mark numbers as they're called, and compete for prizes!</p>
-            <div class="features">
-              <span class="feature">• Generate up to 6 cards</span>
-              <span class="feature">• Real-time game updates</span>
-              <span class="feature">• Score tracking</span>
-              <span class="feature">• Leaderboard</span>
-            </div>
-            <button class="mode-button player-button">
-              Join as Player
-            </button>
-          </div>
-
-          <div
-            class="mode-card board-card"
-            onclick={() => selectMode('board')}
-            onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectMode('board') : null}
-            role="button"
-            tabindex="0"
-            aria-label="Select Board Operator mode"
-          >
-            <div class="mode-icon">🎯</div>
-            <h3>Board Operator</h3>
-            <p>Control the game flow, extract numbers, and manage the tombola session for all players.</p>
-            <div class="features">
-              <span class="feature">• Extract numbers</span>
-              <span class="feature">• Monitor all players</span>
-              <span class="feature">• Game statistics</span>
-              <span class="feature">• Real-time updates</span>
-            </div>
-            <button class="mode-button board-button">
-              Operate Board
-            </button>
-          </div>
-        </div>
-
-        <div class="quick-links">
-          <p class="help-text">
-            <strong>New to Tombola?</strong> It's like Bingo! Numbers are drawn randomly,
-            and players mark them on their cards to win prizes.
-          </p>
-        </div>
-      </div>
-    {:else}
-      <div class="mode-selection disabled">
-        <h2>2. Select Your Mode</h2>
-        <div class="disabled-message">
-          <p>👆 Please choose a game first</p>
-        </div>
-      </div>
-    {/if}
   </div>
 {/if}
 
@@ -487,183 +342,12 @@
     gap: 40px;
   }
 
-  .game-selection h2,
-  .mode-selection h2 {
+  .game-selection h2 {
     color: white;
     font-size: 2.2em;
     margin: 0 0 32px 0;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     text-align: center;
-  }
-
-  .mode-selection.disabled {
-    opacity: 0.6;
-    pointer-events: none;
-  }
-
-  .game-info {
-    color: white;
-    text-align: center;
-    font-size: 1.1em;
-    margin-bottom: 24px;
-    padding: 12px 20px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .game-info strong {
-    color: #FFD700;
-    font-family: 'Courier New', monospace;
-  }
-
-  .disabled-message {
-    text-align: center;
-    padding: 60px 20px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    border: 2px dashed rgba(255, 255, 255, 0.3);
-  }
-
-  .disabled-message p {
-    color: white;
-    font-size: 1.3em;
-    margin: 0;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  }
-
-  .mode-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 30px;
-    margin-bottom: 40px;
-    max-width: 800px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  .mode-card {
-    background: white;
-    border-radius: 16px;
-    padding: 30px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    transition: all 0.3s ease;
-    cursor: pointer;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .mode-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
-  }
-
-  .mode-card:focus {
-    outline: 3px solid #4a90e2;
-    outline-offset: 2px;
-  }
-
-  .mode-card:focus:not(:focus-visible) {
-    outline: none;
-  }
-
-  .mode-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #667eea, #764ba2);
-  }
-
-  .player-card::before {
-    background: linear-gradient(90deg, #667eea, #764ba2);
-  }
-
-  .board-card::before {
-    background: linear-gradient(90deg, #4a90e2, #2c5aa0);
-  }
-
-  .mode-icon {
-    font-size: 4em;
-    margin-bottom: 20px;
-    display: block;
-  }
-
-  .mode-card h3 {
-    margin: 0 0 15px 0;
-    color: #333;
-    font-size: 1.8em;
-    font-weight: bold;
-  }
-
-  .mode-card p {
-    color: #666;
-    font-size: 1.1em;
-    line-height: 1.6;
-    margin-bottom: 20px;
-  }
-
-  .features {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 25px;
-    text-align: left;
-  }
-
-  .feature {
-    color: #555;
-    font-size: 0.95em;
-    padding-left: 8px;
-  }
-
-  .mode-button {
-    width: 100%;
-    padding: 15px 24px;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.1em;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .player-button {
-    background: #667eea;
-    color: white;
-  }
-
-  .player-button:hover {
-    background: #5a6fd8;
-    transform: translateY(-2px);
-  }
-
-  .board-button {
-    background: #4a90e2;
-    color: white;
-  }
-
-  .board-button:hover {
-    background: #357abd;
-    transform: translateY(-2px);
-  }
-
-  .quick-links {
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 12px;
-    padding: 24px;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-
-  .help-text {
-    margin: 0;
-    color: #555;
-    font-size: 1.1em;
-    line-height: 1.6;
   }
 
   /* Authentication-related styles */
@@ -672,47 +356,6 @@
     font-style: italic;
     margin-bottom: 1rem;
     text-align: center;
-  }
-
-  .auth-required {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 20px;
-    text-align: center;
-    color: #856404;
-  }
-
-  .disabled-card {
-    opacity: 0.6;
-    pointer-events: none;
-    position: relative;
-  }
-
-  .disabled-card::after {
-    content: '🔒';
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: 1.5em;
-    opacity: 0.7;
-  }
-
-  .mode-cards.disabled .mode-card {
-    cursor: not-allowed;
-  }
-
-  .mode-button:disabled {
-    background: #ccc !important;
-    color: #666 !important;
-    cursor: not-allowed;
-    transform: none;
-  }
-
-  .mode-button:disabled:hover {
-    background: #ccc !important;
-    transform: none;
   }
 
   @keyframes spin {
@@ -749,7 +392,6 @@
       padding: 1.5rem;
     }
 
-    .mode-selection h2,
     .game-selection h2 {
       font-size: 1.8em;
       margin-bottom: 30px;
@@ -757,33 +399,6 @@
 
     .combined-selector {
       gap: 30px;
-    }
-
-    .mode-cards {
-      grid-template-columns: 1fr;
-      gap: 20px;
-    }
-
-    .mode-card {
-      padding: 24px 20px;
-    }
-
-    .mode-icon {
-      font-size: 3em;
-    }
-
-    .mode-card h3 {
-      font-size: 1.5em;
-    }
-
-    .features {
-      text-align: center;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .mode-card {
-      padding: 20px 16px;
     }
   }
 </style>

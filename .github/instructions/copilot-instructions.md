@@ -14,3 +14,4 @@
 ## Environment Info
 - This is a Windows system with PowerShell, do not use bash commands.
 - If you need to create test scripts, place them in the `tests/` directory.
+- Server documentation is in the workspace directory `tombola` under `docs/`, the most important is `docs/TOMBOLA_API.md`.

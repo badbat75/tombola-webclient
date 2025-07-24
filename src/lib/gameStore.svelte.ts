@@ -69,7 +69,7 @@ export const gameActions = {
 
   async register(playerName: string, cardCount: number = 6): Promise<boolean> {
     try {
-      const response = await tombolaApi.register(playerName, 'player', cardCount);
+      const response = await tombolaApi.joinGame(playerName, 'player', cardCount);
       gameState.clientId = response.client_id;
       gameState.playerName = playerName;
       gameState.isRegistered = true;
@@ -95,18 +95,101 @@ export const gameActions = {
 
   async registerAsBoard(): Promise<boolean> {
     try {
-      // Board clients use special client ID and don't need to register through API
-      const boardClientId = "0000000000000000";
-      gameState.clientId = boardClientId;
-      gameState.playerName = "Board";
-      gameState.isRegistered = true;
-      gameState.error = null;
+      console.log('Starting board registration process...');
 
-      // Set the board client ID in the API client
-      tombolaApi.setClientId(boardClientId);
+      // Clear any existing API state to prevent cached client IDs
+      console.log('Clearing API client state...');
+      tombolaApi.clearState();
 
-      return true;
+      // Ensure the API client has the correct game ID
+      if (!gameState.gameId) {
+        throw new Error('Game ID must be set before board registration');
+      }
+
+      console.log('Setting API game ID to:', gameState.gameId);
+      tombolaApi.setGameId(gameState.gameId);
+
+      // Check if we have an existing user registration - no caching, always fetch fresh
+      const existingClientId = localStorage.getItem('tombola-client-id');
+      const existingUserName = localStorage.getItem('tombola-user-name');
+
+      console.log('LocalStorage check - Raw values:', {
+        clientIdKey: 'tombola-client-id',
+        clientIdValue: existingClientId,
+        userNameKey: 'tombola-user-name',
+        userNameValue: existingUserName,
+        clientIdType: typeof existingClientId,
+        userNameType: typeof existingUserName
+      });
+
+      if (existingClientId && existingUserName) {
+        console.log('Found existing user registration:', { clientId: existingClientId, userName: existingUserName });
+
+        // Check if this user is the board owner of the current game - fresh API call, no cache
+        try {
+          console.log('Checking game ownership with fresh API call...');
+          const gameStatus = await tombolaApi.getStatus();
+          console.log('Current game status:', gameStatus);
+          console.log('Comparing owner ID:', gameStatus.owner, 'with user ID:', existingClientId);
+
+          if (gameStatus.owner === existingClientId) {
+            console.log('✅ User IS the board owner, using existing registration');
+
+            // Use the existing user's registration but set them up for board operations
+            gameState.clientId = existingClientId;
+            gameState.playerName = existingUserName;
+            gameState.isRegistered = true;
+            gameState.error = null;
+
+            // Set the client ID in the API client AFTER clearing state
+            console.log('Setting API client ID to:', existingClientId);
+            tombolaApi.setClientId(existingClientId);
+
+            console.log('Board registration complete using existing user. Client ID:', existingClientId);
+
+            // Verify the API client state
+            console.log('API client state verification:', {
+              gameId: gameState.gameId,
+              clientId: gameState.clientId,
+              playerName: gameState.playerName,
+              apiClientId: tombolaApi.getCurrentClientId()
+            });
+
+            // Load initial game state with fresh data
+            await this.refreshGameState();
+            console.log('Initial game state loaded:', {
+              boardNumbers: gameState.board.numbers.length,
+              pouchNumbers: gameState.pouch.numbers.length,
+              gameStatus: gameState.gameStatus?.status
+            });
+
+            return true;
+          } else {
+            console.log('❌ User is NOT the board owner. Current owner:', gameStatus.owner, 'User:', existingClientId);
+            console.log('❌ This user cannot access board mode for this game. They should create their own game.');
+
+            // Provide a clear error message
+            gameState.error = `Access denied: Only the game creator can access board mode. Game owner: ${gameStatus.owner}, Your ID: ${existingClientId}`;
+            return false;
+          }
+        } catch (statusError) {
+          console.error('❌ Could not check game owner status:', statusError);
+          const errorMessage = statusError instanceof Error ? statusError.message : 'Unknown error';
+          gameState.error = `Unable to verify board ownership: ${errorMessage}`;
+          return false;
+        }
+      } else {
+        console.log('❌ No existing user registration found in localStorage');
+        gameState.error = 'You must be registered to access board mode';
+        return false;
+      }
+
+      // This point should not be reached, but add a fallback just in case
+      console.error('❌ Unexpected state in registerAsBoard');
+      gameState.error = 'Unexpected error during board registration';
+      return false;
     } catch (error) {
+      console.error('Board registration failed:', error);
       gameState.error = error instanceof Error ? error.message : 'Board registration failed';
       return false;
     }

@@ -1,5 +1,5 @@
 // Tombola API Types
-export type ClientType = 'player' | 'admin' | 'viewer';
+export type ClientType = 'player' | 'board';
 
 export interface Card {
   card_id: string;
@@ -27,6 +27,7 @@ export interface GameStatus {
   game_id: string;
   created_at: string;
   closed_at?: string;
+  owner: string;
   players: string;
   cards: string;
   numbers_extracted: number;
@@ -68,27 +69,20 @@ export interface ApiError {
 export interface GameInfo {
   game_id: string;
   status: string;
-  start_date: string;
-  close_date?: string;
-  client_count?: number;
-  extracted_numbers?: number;
+  created_at: string;
+  client_count: number;
+  extracted_numbers: number;
 }
 
 export interface GameListResponse {
   games: GameInfo[];
-  statistics: {
-    active_games: number;
-    closed_games: number;
-    new_games: number;
-  };
-  success: boolean;
-  total_games: number;
 }
 
 export interface NewGameResponse {
   message: string;
   game_id: string;
   created_at: string;
+  board_owner?: string; // Client ID of the game creator
 }
 
 // Game state

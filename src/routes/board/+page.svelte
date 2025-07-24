@@ -74,6 +74,16 @@
       await handleRegister();
       // Start auto-refresh
       gameActions.startAutoRefresh(2000);
+
+      // Debug: Log the initial game state
+      console.log('Board page - Initial game state:', {
+        isConnected: gameState.isConnected,
+        isRegistered: gameState.isRegistered,
+        gameId: gameState.gameId,
+        boardNumbers: gameState.board.numbers,
+        pouchNumbers: gameState.pouch.numbers,
+        gameStatus: gameState.gameStatus
+      });
     }
   });
 
@@ -92,24 +102,68 @@
   async function handleRegister() {
     gameActions.clearError();
     isRegistering = true;
-    await gameActions.registerAsBoard(); // Register as board client with special ID
-    isRegistering = false;
-  }
 
-  async function handleExtractNumber() {
+    console.log('Board page - Starting registration process...');
+    console.log('Board page - Current localStorage (no cache):', {
+      clientId: localStorage.getItem('tombola-client-id'),
+      userName: localStorage.getItem('tombola-user-name'),
+      gameId: localStorage.getItem('tombola-game-id')
+    });
+
+    // Force clear any browser cache by adding a timestamp to localStorage reads
+    const timestamp = Date.now();
+    console.log('Board page - Forcing fresh data at timestamp:', timestamp);
+
+    const success = await gameActions.registerAsBoard();
+
+    if (!success) {
+      console.error('Board registration failed:', gameState.error);
+      // If registration fails, show error and redirect back to home page after a delay
+      setTimeout(() => {
+        alert('Board access denied: ' + (gameState.error || 'Unable to register as board operator'));
+        goto('/');
+      }, 1000);
+    } else {
+      console.log('Board registration successful. Current game state:', {
+        clientId: gameState.clientId,
+        playerName: gameState.playerName,
+        gameId: gameState.gameId,
+        isRegistered: gameState.isRegistered
+      });
+    }
+
+    isRegistering = false;
+  }  async function handleExtractNumber() {
     if (isExtracting) return;
 
     isExtracting = true;
     lastExtractionResult = null;
 
     try {
+      console.log('Attempting extraction with:', {
+        gameId: gameState.gameId,
+        clientId: gameState.clientId,
+        isConnected: gameState.isConnected,
+        isRegistered: gameState.isRegistered
+      });
+
       const result = await tombolaApi.extractNumber();
       lastExtractionResult = `Extracted: ${result.extracted_number} (${result.numbers_remaining} remaining)`;
 
       // Refresh game state to show the new number
       await gameActions.refreshGameState();
     } catch (error) {
-      lastExtractionResult = `Error: ${error instanceof Error ? error.message : 'Failed to extract number'}`;
+      console.error('Extraction error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to extract number';
+
+      // Provide helpful error messages
+      if (errorMessage.includes('board owner') || errorMessage.includes('Unauthorized')) {
+        lastExtractionResult = `Error: Only the game creator can extract numbers. Create a new game to become a board operator.`;
+      } else if (errorMessage.includes('empty') || errorMessage.includes('remaining')) {
+        lastExtractionResult = `Error: No numbers remaining in the pouch. Game is complete!`;
+      } else {
+        lastExtractionResult = `Error: ${errorMessage}`;
+      }
     }
 
     isExtracting = false;

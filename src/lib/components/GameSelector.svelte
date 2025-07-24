@@ -1,23 +1,34 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { tombolaApi } from '../api.js';
   import type { GameInfo, GameStatus } from '../types.js';
   import { getScoreText, getScoreColor } from '../scoreUtils.js';
+  import { gameActions } from '../gameStore.svelte.js';
+  import GameJoinDialog from './GameJoinDialog.svelte';
 
   interface Props {
     onGameSelected: (gameId: string) => void;
     readonly?: boolean;
     authEnabled?: boolean;
+    userRegistered?: boolean;
+    userName?: string;
   }
 
-  let { onGameSelected, readonly = false, authEnabled = true }: Props = $props();
+  let { onGameSelected, readonly = false, authEnabled = true, userRegistered = false, userName = '' }: Props = $props();
 
   let games: GameInfo[] = $state([]);
   let gameDetails = $state<Map<string, GameStatus>>(new Map());
+  let gameCreators = $state<Map<string, { name: string; clientId: string }>>(new Map());
   let gameStats = $state<any>(null);
   let loading = $state(true);
   let creating = $state(false);
   let error = $state<string | null>(null);
+
+  // Dialog state
+  let showJoinDialog = $state(false);
+  let selectedGame = $state<string | null>(null);
+  let selectedGameDetail = $state<GameStatus | null>(null);
 
   onMount(async () => {
     await loadGames();
@@ -29,7 +40,7 @@
       error = null;
       const response = await tombolaApi.getGamesList();
       games = response.games;
-      gameStats = response.statistics;
+      gameStats = null; // Statistics are not provided in the new API structure
 
       // Load detailed status for each game
       await loadGameDetails();
@@ -48,6 +59,10 @@
       try {
         const status = await tombolaApi.getGameStatus(game.game_id);
         detailsMap.set(game.game_id, status);
+
+        // Try to identify the game creator (board client)
+        // This is a best-effort approach since the API doesn't directly provide this
+        await loadGameCreator(game.game_id);
       } catch (err) {
         console.warn(`Failed to load details for game ${game.game_id}:`, err);
       }
@@ -57,8 +72,105 @@
     gameDetails = detailsMap;
   }
 
+  async function loadGameCreator(gameId: string) {
+    try {
+      // The board ownership system: Each game has exactly one board owner
+      // who gets the special BOARD_ID card ("0000000000000000")
+      // The board owner is the person who created the game and has extraction privileges
+
+      // If we already have creator info from game creation, use it
+      if (gameCreators.has(gameId)) {
+        return;
+      }
+
+      // Get the game status to find the board owner
+      tombolaApi.setGameId(gameId);
+      const gameStatus = await tombolaApi.getStatus();
+
+      if (gameStatus.owner) {
+        // Get the client information for the board owner
+        const clientInfo = await tombolaApi.getClientById(gameStatus.owner);
+
+        gameCreators.set(gameId, {
+          name: clientInfo.name,
+          clientId: clientInfo.client_id
+        });
+      } else {
+        // Fallback if no owner info is available
+        gameCreators.set(gameId, {
+          name: "Unknown Creator",
+          clientId: "unknown"
+        });
+      }
+    } catch (err) {
+      console.warn(`Failed to load creator for game ${gameId}:`, err);
+      // Fallback for existing games or API errors
+      gameCreators.set(gameId, {
+        name: "Unknown Creator",
+        clientId: "unknown"
+      });
+    }
+  }
+
   function selectGame(gameId: string) {
-    onGameSelected(gameId);
+    const detail = getGameDetail(gameId);
+    if (detail) {
+      selectedGame = gameId;
+      selectedGameDetail = detail;
+      showJoinDialog = true;
+    }
+  }
+
+  function closeJoinDialog() {
+    showJoinDialog = false;
+    selectedGame = null;
+    selectedGameDetail = null;
+  }
+
+  async function handleJoinGame(event: CustomEvent) {
+    try {
+      const { gameId, cardCount } = event.detail;
+
+      // Set the game ID in the API client
+      await gameActions.setGameId(gameId);
+
+      // Register with the selected number of cards
+      const success = await gameActions.register(userName, cardCount);
+
+      if (success) {
+        // Navigate to player page
+        await goto(`/player?gameId=${gameId}`);
+      } else {
+        console.error('Failed to register for game');
+      }
+
+      // Notify parent that game was selected
+      onGameSelected(gameId);
+
+      // Close the dialog
+      selectedGame = null;
+      selectedGameDetail = null;
+    } catch (error) {
+      console.error('Failed to join game:', error);
+    }
+  }
+
+  async function handleJoinBoard(event: CustomEvent) {
+    try {
+      const { gameId } = event.detail;
+
+      // Set the game ID in the API client
+      await gameActions.setGameId(gameId);
+
+      // Navigate to board page with gameId parameter
+      await goto(`/board?gameId=${gameId}`);
+
+      // Close the dialog
+      selectedGame = null;
+      selectedGameDetail = null;
+    } catch (error) {
+      console.error('Failed to join game as board owner:', error);
+    }
   }
 
   async function createNewGame() {
@@ -67,6 +179,14 @@
       error = null;
 
       const response = await tombolaApi.createNewGame();
+
+      // If we have creator info from the response, store it
+      if (response.board_owner && userName) {
+        gameCreators.set(response.game_id, {
+          name: userName,
+          clientId: response.board_owner
+        });
+      }
 
       // Refresh the games list to include the new game
       await loadGames();
@@ -144,7 +264,7 @@
         </div>
       {/if}
       {#if !readonly}
-        <button class="create-btn" onclick={createNewGame} disabled={creating || loading}>
+        <button class="create-btn" onclick={createNewGame} disabled={creating || loading || (!userRegistered && !readonly)}>
           {creating ? '🔄 Creating...' : '🆕 Create New Game'}
         </button>
       {/if}
@@ -172,9 +292,6 @@
         <p>Check back later for available games!</p>
       {:else}
         <p>Create a new game to get started!</p>
-        <button class="create-game-primary" onclick={createNewGame} disabled={creating}>
-          {creating ? '🔄 Creating...' : '🆕 Create Your First Game'}
-        </button>
       {/if}
     </div>
   {:else}
@@ -183,10 +300,11 @@
         {@const detail = getGameDetail(game.game_id)}
         <div
           class="game-card"
-          onclick={() => selectGame(game.game_id)}
+          onclick={() => userRegistered || readonly ? selectGame(game.game_id) : null}
           role="button"
           tabindex="0"
-          onkeydown={(e) => e.key === 'Enter' || e.key === ' ' ? selectGame(game.game_id) : null}
+          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (userRegistered || readonly) ? selectGame(game.game_id) : null}
+          class:clickable={userRegistered || readonly}
         >
           <div class="game-header">
             <div class="game-status" style="color: {getStatusColor(game.status || 'unknown')}">
@@ -198,7 +316,16 @@
           <div class="game-info">
             <div class="info-row">
               <span class="label">Created:</span>
-              <span class="value">{formatDate(game.start_date)}</span>
+              <span class="value">{formatDate(game.created_at)}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">Created by:</span>
+              <span class="value">
+                👤 {gameCreators.get(game.game_id)?.name || 'Game Creator'}
+                {#if gameCreators.get(game.game_id)?.clientId && gameCreators.get(game.game_id)?.clientId !== 'unknown'}
+                  <span class="creator-id">({gameCreators.get(game.game_id)?.clientId})</span>
+                {/if}
+              </span>
             </div>
             {#if detail}
               <div class="info-row">
@@ -235,20 +362,36 @@
                 <span class="value">🔢 {game.extracted_numbers || 0}/90</span>
               </div>
             {/if}
-            {#if game.close_date}
+            {#if detail && detail.closed_at}
               <div class="info-row">
                 <span class="label">Closed:</span>
-                <span class="value">{formatDate(game.close_date)}</span>
+                <span class="value">{formatDate(detail.closed_at)}</span>
               </div>
             {/if}
           </div>
 
-          <button class="select-btn">
-            {game.status === 'new' ? 'Join Game' : game.status === 'active' ? 'Join Active Game' : 'View Game'}
+          <button class="select-btn" class:disabled={!userRegistered && !readonly}>
+            {#if !userRegistered && !readonly}
+              Register to Join
+            {:else}
+              {game.status?.toLowerCase() === 'new' ? 'Join Game' : game.status?.toLowerCase() === 'active' ? 'Join Active Game' : 'View Game'}
+            {/if}
           </button>
         </div>
       {/each}
     </div>
+  {/if}
+
+  <!-- Game Join Dialog -->
+  {#if showJoinDialog && selectedGameDetail && userName}
+    <GameJoinDialog
+      bind:isOpen={showJoinDialog}
+      game={selectedGameDetail}
+      {userName}
+      on:join={handleJoinGame}
+      on:joinBoard={handleJoinBoard}
+      on:close={closeJoinDialog}
+    />
   {/if}
 </div>
 
@@ -392,33 +535,6 @@
     font-size: 1.2em;
   }
 
-  .create-game-primary {
-    background: #28a745;
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 16px 32px;
-    font-size: 1.1em;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 20px;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-  }
-
-  .create-game-primary:hover:not(:disabled) {
-    background: #218838;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4);
-  }
-
-  .create-game-primary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
-  }
-
   .games-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -431,7 +547,6 @@
     border: 2px solid #e9ecef;
     border-radius: 12px;
     padding: 20px;
-    cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     min-height: 280px;
@@ -439,13 +554,17 @@
     flex-direction: column;
   }
 
-  .game-card:hover {
+  .game-card.clickable {
+    cursor: pointer;
+  }
+
+  .game-card.clickable:hover {
     border-color: #4a90e2;
     transform: translateY(-4px);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   }
 
-  .game-card:focus {
+  .game-card.clickable:focus {
     outline: 3px solid #4a90e2;
     outline-offset: 2px;
   }
@@ -493,6 +612,14 @@
     font-weight: bold;
   }
 
+  .creator-id {
+    color: #6c757d;
+    font-size: 0.8rem;
+    font-family: 'Courier New', monospace;
+    font-weight: normal;
+    margin-left: 0.5rem;
+  }
+
   .progress-bar {
     position: relative;
     background: #e9ecef;
@@ -536,6 +663,15 @@
 
   .select-btn:hover {
     background: #357abd;
+  }
+
+  .select-btn.disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+
+  .select-btn.disabled:hover {
+    background: #6c757d;
   }
 
   @media (max-width: 768px) {

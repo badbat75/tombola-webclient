@@ -9,8 +9,8 @@ export const load: PageServerLoad = async ({ cookies, request }) => {
 
   const authEnabled = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-  // If auth is enabled, validate the user's authentication
-  if (authEnabled) {
+  // Only enforce auth validation if BOTH URL and KEY are properly configured
+  if (authEnabled && SUPABASE_URL?.startsWith('http') && SUPABASE_ANON_KEY?.length > 20) {
     // Try to get auth token from cookies
     const authToken = cookies.get('supabase-auth-token');
 

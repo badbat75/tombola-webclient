@@ -4,27 +4,25 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 
 ## 🎯 Features
 
-### 🔐 Advanced Authentication System
-- 🪄 **Magic Link Authentication**: Passwordless login via email (no passwords required)
-- 🔒 **Server-Side JWT Validation**: Secure route protection with server-side token verification
-- 👤 **User Identity**: Display authenticated user's name or email in the header
-- 🔄 **Persistent Sessions**: Automatic token storage and validation across browser sessions
-- 📧 **Email-based Flow**: Simple authentication workflow using magic links sent to email
-- ⚡ **Real-time Auth State**: Dynamic UI that adapts based on authentication status
-- 🚀 **Supabase Integration**: Direct REST API integration with Supabase authentication (no SDK required)
-- �️ **Route Protection**: `/player` and `/board` routes protected when authentication is enabled
-- 🍪 **Cookie-based Sessions**: JWT tokens stored in HTTP cookies for server-side validation
-- 🔀 **Optional Authentication**: System works seamlessly with auth enabled or completely disabled
-- 🚫 **Client-Side Security**: No sensitive credentials exposed to browser (server-side only)
+### 🔐 User Registration System
+- 📝 **Simple Registration**: Users register with just their name via the header input
+- 👤 **Global User Identity**: Registered users can join multiple games with the same identity
+- 🎮 **Game Selection**: After registration, users can browse and join available games
+- 🎯 **Smart Game Joining**:
+  - **New Games**: Users can request cards to participate fully
+  - **Active Games**: Users can join as spectators to watch the game progress
+- 💾 **Persistent Identity**: User registration saved in localStorage for convenience
+- � **Flexible Flow**: No authentication required - just enter your name and start playing
 
 ### Multi-Game Architecture Support
 - 🎮 **Game Discovery**: Browse available games with detailed status information
-- ✨ **Game Creation**: Create new games directly from the web interface
-- 🔀 **Game Selection**: Choose your preferred game with enhanced information display
+- ✨ **Game Creation**: Create new games directly from the web interface (board clients only)
+- 🔀 **Smart Game Joining**: Interactive dialog shows game details and participation options
 - 📊 **Detailed Game Status**: View player counts, card assignments, extraction progress, and best scores
 - 📈 **Progress Visualization**: Visual progress bars showing game completion status
 - 🏆 **Achievement Tracking**: Display current best scores and prize levels per game
 - 🗂️ **Client Name Resolution**: Proper display of player names instead of client IDs
+- 👥 **Registration State Awareness**: UI adapts based on whether user is registered or not
 
 ### For Card Players (`/player?gameId={game_id}`)
 - 🎫 **Multi-Card Management**: Generate and manage up to 6 tombola cards simultaneously
@@ -52,127 +50,77 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm
-- Rust Tombola API Server running on `localhost:3000` with multi-game support
+- Node.js 18 or higher
+- npm or yarn
+- Tombola API server running on http://127.0.0.1:3000
 
-### 1. Configure Server Connection and Authentication
+### Development
 
-#### Server-Side Authentication Configuration
-Copy the example configuration file and customize for your environment:
 ```bash
-copy .env.example .env
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# The client will automatically detect if authentication is configured on the server
+# If no Supabase credentials are properly configured, simple registration mode is used
 ```
 
-Update the `.env` file with your server configuration:
+### Environment Configuration
+
+The client supports both simple registration and full authentication modes:
+
+**Simple Registration Mode** (default if Supabase not configured):
 ```env
-# Server endpoint configuration
+# .env
 API_HOST=127.0.0.1
 API_PORT=3000
 API_PROTOCOL=http
-
-# Optional: Enable debug logging
 DEBUG_MODE=false
 
-# Supabase Configuration (for authentication)
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_ANON_KEY=your-supabase-anon-key
+# No Supabase configuration needed for simple registration
 ```
 
-#### Authentication Modes
-
-**🔒 With Authentication (Default)**
-- Uncomment the Supabase configuration lines
-- `/player` and `/board` routes require valid JWT tokens
-- Server-side validation protects all protected routes
-- Magic link authentication via email
-
-**🚪 Without Authentication (Optional)**
-- Comment out or remove `SUPABASE_URL` and `SUPABASE_ANON_KEY`
-- All routes become publicly accessible
-- No login required
-- Perfect for local development or public instances
-
+**Full Authentication Mode** (requires proper Supabase configuration):
 ```env
-# To disable authentication, comment out these lines:
-#SUPABASE_URL=https://your-project-ref.supabase.co
-#SUPABASE_ANON_KEY=your-supabase-anon-key
-```
-
-**🔐 Security Features:**
-- 🛡️ Server-side JWT token validation for protected routes
-- 🍪 HTTP-only cookies for secure session management
-- 🚫 No sensitive credentials exposed to browser
-- ⚡ Automatic token refresh and validation
-- 🔀 Graceful degradation when authentication is disabled
-**🚀 Authentication Features:**
-- ✅ Magic link authentication (passwordless)
-- ✅ JWT token management with automatic refresh
-- ✅ User profile access
-- ✅ Session management with HTTP-only cookies
-- ✅ Server-side route protection
-- ✅ Direct REST API calls (no Supabase SDK required)
-- ✅ Complete client-side credential isolation
-
-**🛡️ Route Protection:**
-When authentication is enabled, the following routes require valid JWT tokens:
-- `/player?gameId={game_id}` - Protected for authenticated card players
-- `/board?gameId={game_id}` - Protected for authenticated board operators
-- `/` - Always accessible (handles authentication flow)
-
-When authentication is disabled, all routes are publicly accessible.
-
-Edit the API configuration to match your game server setup:
-```env
+# .env
 API_HOST=127.0.0.1
 API_PORT=3000
 API_PROTOCOL=http
-```
+DEBUG_MODE=false
 
-For detailed configuration options, see [CONFIG.md](CONFIG.md).
-
-### 2. Start the Tombola API Server
-From the main tombola directory:
-```bash
-cargo run --bin tombola-server
-```
-
-### 3. Install Dependencies
-```bash
-npm install
-```
-
-### 4. Start Development Server
-```bash
-npm run dev
-```
-
-### 5. Access the Application
-- **Game Selection**: http://localhost:5173 (choose game and mode)
-- **Direct Card Player**: http://localhost:5173/player?gameId={game_id}
-- **Direct Board Operator**: http://localhost:5173/board?gameId={game_id}
+# Supabase configuration for full authentication
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
 
 ## 🏗️ Architecture
 
 ### Multi-Game Flow
-1. **Game Selection**: Browse available games or create a new one
-2. **Mode Selection**: Choose between Player (cards) or Board (operator) mode
-3. **Game Interaction**: Connect to the specific game with proper game ID routing
+1. **User Registration**: Register your name in the header (persistent across games)
+2. **Game Selection**: Browse available games or create a new one
+3. **Game Joining**: Interactive dialog with options for cards or board access
+4. **Game Interaction**: Connect to the specific game with proper game ID routing
 
 ### Route Structure
 ```
-/                           - Landing page with game selection and mode selection
+/                           - Landing page with user registration and game selection
 /player?gameId={game_id}   - Card player interface for specific game
 /board?gameId={game_id}    - Board operator interface for specific game
 ```
 
 ### Key Components
 - **`GameSelector.svelte`**: Game discovery, selection, and creation interface with enhanced score display
+- **`GameJoinDialog.svelte`**: Interactive modal for joining games with board ownership verification
+- **`CardSelectionModal.svelte`**: Modal for selecting number of cards when joining new games
+- **`UserRegistration.svelte`**: Simple name-based registration component for persistent identity
 - **`Board.svelte`**: Configurable board component with `normal`/`large` size variants
 - **`Card.svelte`**: Individual tombola card with number tracking
 - **`GameFooter.svelte`**: Connection status and game information
 - **`LeaderboardSidebar.svelte`**: Real-time player rankings with name resolution and color-coded achievements
 - **`ScoreBoard.svelte`**: Achievement display with consistent score formatting
 - **`gameStore.svelte.ts`**: Centralized game state management with Svelte 5 runes and client caching
+- **`userRegistration.ts`**: Store for managing user registration state across the application
 - **`scoreUtils.ts`**: Centralized score mapping and formatting utilities
 
 ### Technology Stack
@@ -184,28 +132,48 @@ npm run dev
 
 ## 🎮 How to Play
 
-### Getting Started
-1. **Select Game**: Navigate to http://localhost:5173 and browse available games with detailed information:
+### Getting Started (Simple Registration Mode)
+1. **Register Your Name**: Enter your name in the input box in the header and click "Register"
+2. **Browse Games**: View all available games with detailed information:
    - **Game Status**: New, Active, or Closed games with visual indicators
    - **Player Count**: Number of registered players and assigned cards
    - **Progress**: Visual progress bars showing extraction completion (0-90 numbers)
    - **Best Scores**: Current highest achievements and prize levels
    - **Creation Time**: When each game was created
-2. **Create Game** (Optional): Click "Create New Game" to start a fresh game
-3. **Choose Mode**: Select either "Player (Cards)" or "Board (Operator)" mode
+3. **Join a Game**: Click on any game to open the game join dialog:
+   - **New Games**: Option to join with cards (full participation) or as spectator
+   - **Active Games**: Join as spectator only (no cards available)
+4. **Create Game** (Board clients only): Board operators can create new games
+
+### User Registration Flow
+1. **First Visit**: Games are visible but disabled until you register
+2. **Register**: Enter your name in the header - this creates a global user account
+3. **Game Selection**: Once registered, you can click on games to join them
+4. **Join Options**:
+   - **New Games**: Choose between "Play with cards" (6 cards) or "Spectator mode"
+   - **Active Games**: Automatically join as spectator (games already started)
+5. **Persistent Identity**: Your registration persists across browser sessions
 
 ### For Card Players
-1. **Connect**: The app automatically connects to your selected game
-2. **Register**: Enter your player name and choose number of cards (1-6)
+1. **Join Game**: Select a game and choose "Play with cards" if it's new
+2. **Auto-Registration**: You're automatically registered to the specific game
 3. **Play**: Watch for number extractions and track progress on your cards
 4. **Win**: Complete lines horizontally, vertically, or diagonally for points
 5. **BINGO**: Fill an entire card to achieve BINGO status!
 
 ### For Board Operators
-1. **Connect**: Automatically registers as board viewer for the selected game
-2. **Extract Numbers**: Click "Extract Number" to draw the next number
-3. **Monitor**: Watch the large board display and recent extractions
-4. **Track**: Monitor player leaderboard with resolved player names in real-time
+1. **Register**: Enter your name in the header to create persistent identity
+2. **Create Game**: Create a new game to become the board owner
+3. **Board Access**: Only game creators can access board mode for their games
+4. **Extract Numbers**: Click "Extract Number" to draw the next number
+5. **Monitor**: Watch the large board display and recent extractions
+6. **Track**: Monitor player leaderboard with resolved player names in real-time
+
+### Board Ownership System
+- **Game Creator**: The person who creates a game becomes the board owner
+- **Board Access**: Only the board owner can access the `/board` route for that game
+- **Ownership Verification**: System compares user names to verify board ownership
+- **Security**: Prevents unauthorized access to number extraction functionality
 
 ### Multi-Game Benefits
 - **Parallel Games**: Multiple games can run simultaneously without interference
@@ -263,22 +231,70 @@ The web client communicates with the Rust Tombola API server through RESTful end
 ### Global Endpoints
 - `GET /gameslist` - List all available games with status
 - `POST /newgame` - Create a new game (returns game ID)
+- `POST /register` - Global user registration with name
 - `GET /clientinfo/{client_id}` - Get client info by ID (global search)
 
 ### Game-Specific Endpoints (require `/{game_id}/` routing)
 - `GET /{game_id}/status` - Retrieve current game state
-- `POST /{game_id}/register` - Register as player or viewer
-- `POST /{game_id}/extract` - Extract next number (operators only)
+- `POST /{game_id}/join` - Join specific game as player or board client
+- `POST /{game_id}/extract` - Extract next number (board owners only)
 - `GET /{game_id}/board` - Get current board state
 - `GET /{game_id}/scoremap` - Get current scores and achievements
+- `POST /{game_id}/generatecards` - Generate cards for player
 - `GET /{game_id}/listassignedcards` - List client's assigned cards
 - `GET /{game_id}/getassignedcard/{card_id}` - Get specific card details
 
-## 🔐 Authentication System
+## 🔐 Registration & Authentication System
 
-The Tombola Web Client implements a **comprehensive server-side authentication system** with optional Supabase integration. The system is designed with security as a priority, featuring server-side JWT validation and zero client-side credential exposure.
+The Tombola Web Client implements a **flexible dual-mode system** that adapts based on server configuration, supporting both simple name-based registration and full Supabase authentication.
 
 ### Architecture Overview
+
+#### 🎯 Dual System Design
+- **Simple Registration Mode**: Default mode requiring only a name for participation
+- **Full Authentication Mode**: Optional Supabase integration with magic link authentication
+- **Server Detection**: Automatically detects which mode to use based on server configuration
+- **Seamless Experience**: Users don't need to know which mode is active
+
+#### 🔄 Simple Registration Flow (Default)
+1. **Name Registration**: User enters their name in the header input
+2. **Global Identity**: Creates a persistent user identity across all games
+3. **Game Joining**: Interactive dialog for joining games with different participation options
+4. **Board Ownership**: Game creators automatically become board owners
+5. **Persistent State**: Registration saved in localStorage for convenience
+
+#### � Full Authentication Flow (Optional)
+1. **Email Input**: User enters email on landing page
+2. **Magic Link**: Server sends magic link via Supabase API
+3. **Token Verification**: Magic link processed server-side with JWT validation
+4. **Session Creation**: Valid tokens stored in HTTP-only cookies
+5. **Route Access**: Protected routes validate JWT server-side before rendering
+
+### Simple Registration Mode
+
+#### User Registration System
+- **🏷️ Name-Based**: Simple name input creates global user identity
+- **💾 Local Storage**: Registration persists across browser sessions
+- **🎮 Game Discovery**: Browse and join available games after registration
+- **🔑 Board Ownership**: Game creators automatically get board access
+- **🚀 No Setup**: Works immediately without external service configuration
+
+#### Game Joining Process
+1. **Register Name**: Enter name in header to create persistent identity
+2. **Browse Games**: View all available games with status indicators
+3. **Join Dialog**: Interactive modal shows game details and join options:
+   - **New Games**: Choose between playing with cards or spectator mode
+   - **Active Games**: Join as spectator (cards may still be available)
+   - **Board Access**: Available only to game creators
+4. **Card Selection**: Choose number of cards (1-10) for new games
+
+#### Board Ownership Verification
+- **Creator Rights**: Only the person who creates a game can access board mode
+- **Name Comparison**: System verifies board ownership using registered name
+- **Access Control**: Unauthorized users redirected with clear error messages
+- **Security**: Prevents unauthorized number extraction
+
+### Full Authentication Mode
 
 #### 🛡️ Security-First Design
 - **Server-Side Rendering (SSR)**: All authentication checks happen server-side
@@ -287,72 +303,79 @@ The Tombola Web Client implements a **comprehensive server-side authentication s
 - **Zero Client Exposure**: No authentication credentials or configuration exposed to the browser
 - **Route Protection**: Server-side enforcement for `/player` and `/board` routes when authentication is enabled
 
-#### 🔄 Authentication Flow
-1. **Email Input**: User enters email on landing page (server-rendered form)
-2. **Magic Link**: Server sends magic link via Supabase API
-3. **Token Verification**: Magic link processed server-side with JWT validation
-4. **Session Creation**: Valid tokens stored in HTTP-only cookies
-5. **Route Access**: Protected routes validate JWT server-side before rendering
+#### 🎯 Identity Management
+The system maintains separate but coordinated identity concepts:
 
-#### 🎯 Dual Identity System
-The system maintains two separate identity concepts:
-
-**🔐 User Authentication (JWT)**
-- **Purpose**: User identity and session management
-- **Implementation**: Server-side JWT validation with Supabase
-- **Scope**: Controls access to protected routes when authentication is enabled
-- **Storage**: HTTP-only cookies for security
+**� User Identity**
+- **Simple Mode**: Name-based registration stored in localStorage
+- **Auth Mode**: JWT-validated user sessions with Supabase integration
+- **Purpose**: Controls access to games and board ownership
+- **Persistence**: localStorage (simple) or HTTP-only cookies (auth)
 
 **🎮 Game Client ID**
 - **Purpose**: Game participation and state tracking
-- **Implementation**: Dynamic 16-character hex IDs for players, fixed ID for board operators
+- **Implementation**: Dynamic 16-character hex IDs for players
 - **Scope**: Game-specific registration and API communication
-- **Storage**: Client-side for game functionality
+- **Storage**: Managed by API client for game functionality
 
-### Configuration Options
+### Configuration
 
-#### Optional Authentication
-Authentication can be completely disabled by omitting Supabase configuration:
+#### Simple Registration Mode (Default)
+No configuration required - works out of the box:
 
 ```env
-# Authentication disabled - all routes accessible
-# (no SUPABASE_ variables configured)
+# Simple registration mode active when Supabase not configured
+# No additional environment variables needed
 ```
 
-#### Supabase Authentication
-```env
-# Required for authentication
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+#### Full Authentication Mode
+Requires Supabase configuration:
 
-# Optional - public key for client-side features (if needed)
-PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```env
+# Enable full authentication mode
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+### Development and Testing
+
+#### Testing Simple Registration Mode
+```bash
+# Remove or comment out Supabase configuration
+# SUPABASE_URL=...
+# SUPABASE_ANON_KEY=...
+
+npm run dev  # Simple registration mode active
+```
+
+#### Testing Full Authentication Mode
+```bash
+# Enable authentication with proper Supabase configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+
+npm run dev  # Full authentication mode active
 ```
 
 ### Server-Side Implementation
 
-#### Protected Route Enforcement
-Routes `/player` and `/board` include server-side JWT validation:
+## 🎨 Customization
 
-```typescript
-// src/routes/player/+page.server.ts
-export async function load({ cookies, url }) {
-    // Check if authentication is enabled
-    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-        const token = cookies.get('sb-access-token');
+### Board Sizes
+The `Board.svelte` component supports two size variants:
+- `normal` - Compact view for card players (24px circles, 11px fonts)
+- `large` - Enhanced view for operators (48px circles, 22px fonts, increased spacing)
 
-        // Validate JWT with Supabase
-        const user = await getSupabaseUser(token);
-        if (!user) {
-            throw redirect(302, '/');
-        }
+### Game Join Dialog Options
+The `GameJoinDialog.svelte` component provides different join options based on game state:
+- **New Games**: Full participation with customizable card count
+- **Active Games**: Spectator mode or rejoin with existing cards
+- **Board Access**: Exclusive to game creators with ownership verification
 
-        return { user };
-    }
-    // Authentication disabled - allow access
-    return {};
-}
-```
+### User Registration Components
+- **Simple Mode**: `UserRegistration.svelte` for name-based registration
+- **Auth Mode**: `AuthButton.svelte` for magic link authentication
+- **Persistent State**: Registration data maintained across sessions
 
 #### Magic Link Processing
 Server handles magic link verification and cookie management:
@@ -394,44 +417,36 @@ export async function GET({ url, cookies }) {
 
 ### API Integration
 
-When authentication is enabled, the system integrates with the Tombola API server using dual headers:
+The system integrates with the Tombola API server using different approaches based on mode:
 
+#### Simple Registration Mode
 ```typescript
-// Authenticated API request
+// API requests with user identity
 headers: {
-    'Authorization': `Bearer ${jwtToken}`,     // User authentication
-    'X-Client-ID': clientId                   // Game participation
+    'X-Client-ID': globalClientId,  // Global user registration ID
+    'Content-Type': 'application/json'
 }
 ```
 
-### Development and Testing
-
-#### Testing Without Authentication
-```bash
-# Disable authentication by removing/commenting Supabase config
-# SUPABASE_URL=...
-# SUPABASE_SERVICE_ROLE_KEY=...
-
-npm run dev  # All routes accessible without authentication
-```
-
-#### Testing With Authentication
-```bash
-# Enable authentication with proper Supabase configuration
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-npm run dev  # Routes protected, magic link authentication required
+#### Full Authentication Mode
+```typescript
+// API requests with authentication
+headers: {
+    'Authorization': `Bearer ${jwtToken}`,  // User authentication
+    'X-Client-ID': gameClientId,            // Game participation
+    'Content-Type': 'application/json'
+}
 ```
 
 ### Benefits
 
-- **🛡️ Security**: Server-side validation prevents client-side authentication bypass
-- **🔒 Privacy**: Zero credential exposure to browser or client-side code
-- **⚡ Performance**: Efficient JWT validation with proper caching
-- **🔧 Flexibility**: Optional authentication system - can be completely disabled
-- **📱 UX**: Seamless magic link flow with automatic redirects
-- **🎯 Separation**: Clean separation between user identity and game participation
+- **🚀 Quick Start**: Simple registration works immediately without setup
+- **🔧 Flexibility**: Optional authentication for enhanced security when needed
+- **🛡️ Security**: Server-side validation in auth mode prevents bypass
+- **� Identity**: Persistent user identity across games and sessions
+- **🎮 Ownership**: Clear board ownership model with access control
+- **📱 UX**: Intuitive registration flow with minimal friction
+- **🔒 Privacy**: No credentials exposed in simple mode, secure storage in auth mode
 
 ## 🎨 Customization
 

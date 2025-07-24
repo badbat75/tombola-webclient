@@ -23,7 +23,7 @@ const API_PROTOCOL = import.meta.env.API_PROTOCOL || 'http';
 const API_BASE_URL = `${API_PROTOCOL}://${API_HOST}:${API_PORT}`;
 
 // Debug logging helper
-const DEBUG_MODE = import.meta.env.DEBUG_MODE === 'true';
+const DEBUG_MODE = import.meta.env.DEBUG_MODE === 'true' || true; // Enable debug for now
 const debugLog = (message: string, data?: any) => {
   if (DEBUG_MODE) {
     console.log(`[Tombola API] ${message}`, data || '');
@@ -47,15 +47,28 @@ class TombolaApiClient {
   }
 
   setClientId(clientId: string) {
+    debugLog(`Setting client ID: ${this.clientId} -> ${clientId}`);
     this.clientId = clientId;
   }
 
   setGameId(gameId: string) {
+    debugLog(`Setting game ID: ${this.gameId} -> ${gameId}`);
     this.gameId = gameId;
+  }
+
+  // Clear all cached state
+  clearState() {
+    debugLog(`Clearing API client state - ClientID: ${this.clientId}, GameID: ${this.gameId}`);
+    this.clientId = null;
+    this.gameId = null;
   }
 
   getGameId(): string | null {
     return this.gameId;
+  }
+
+  getCurrentClientId(): string | null {
+    return this.clientId;
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -65,6 +78,9 @@ class TombolaApiClient {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
       ...((options.headers as Record<string, string>) || {})
     };
 
@@ -77,6 +93,11 @@ class TombolaApiClient {
 
     if (this.clientId && !headers['X-Client-ID']) {
       headers['X-Client-ID'] = this.clientId;
+      debugLog(`Added Client-ID header: ${this.clientId}`);
+    } else if (headers['X-Client-ID']) {
+      debugLog(`Using existing Client-ID header: ${headers['X-Client-ID']}`);
+    } else {
+      debugLog('No Client-ID header available');
     }
 
     try {
@@ -119,10 +140,7 @@ class TombolaApiClient {
 
   async createNewGame(): Promise<NewGameResponse> {
     return this.request<NewGameResponse>('/newgame', {
-      method: 'POST',
-      headers: {
-        'X-Client-ID': '0000000000000000' // Board client ID
-      }
+      method: 'POST'
     });
   }
 
@@ -130,18 +148,31 @@ class TombolaApiClient {
     return this.request<GameStatus>(`/${gameId}/status`);
   }
 
-  // Client Registration (Game-specific)
-  async register(name: string, clientType: 'player' | 'admin' | 'viewer' = 'player', nocard?: number): Promise<RegistrationResponse> {
+  // Global Client Registration
+  async globalRegister(name: string, clientType: 'player' | 'board' = 'player'): Promise<RegistrationResponse> {
+    const body = { name, client_type: clientType };
+
+    return this.request<RegistrationResponse>('/register', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+  }
+
+  // Game-specific Client Registration (Join)
+  async joinGame(name: string, clientType: 'player' | 'board' = 'player', nocard?: number, email?: string): Promise<RegistrationResponse> {
     if (!this.gameId) {
-      throw new Error('Game ID must be set before registering');
+      throw new Error('Game ID must be set before joining game');
     }
 
     const body: any = { name, client_type: clientType };
     if (nocard !== undefined) {
       body.nocard = nocard;
     }
+    if (email !== undefined) {
+      body.email = email;
+    }
 
-    return this.request<RegistrationResponse>(`/${this.gameId}/register`, {
+    return this.request<RegistrationResponse>(`/${this.gameId}/join`, {
       method: 'POST',
       body: JSON.stringify(body)
     });
@@ -214,10 +245,7 @@ class TombolaApiClient {
     }
 
     return this.request<ExtractionResponse>(`/${this.gameId}/extract`, {
-      method: 'POST',
-      headers: {
-        'X-Client-ID': '0000000000000000' // Board client ID
-      }
+      method: 'POST'
     });
   }
 
@@ -227,10 +255,7 @@ class TombolaApiClient {
     }
 
     return this.request<any>(`/${this.gameId}/dumpgame`, {
-      method: 'POST',
-      headers: {
-        'X-Client-ID': '0000000000000000' // Board client ID
-      }
+      method: 'POST'
     });
   }
 

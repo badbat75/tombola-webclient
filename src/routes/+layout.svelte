@@ -6,6 +6,7 @@
 	import { processMagicLink } from '$lib/auth-client.js';
 	import { gameActions } from '$lib/gameStore.svelte.js';
 	import AuthButton from '$lib/components/AuthButton.svelte';
+	import UserRegistration from '$lib/components/UserRegistration.svelte';
 	import '../app.css';
 
 	// Get server-side auth configuration
@@ -72,7 +73,11 @@
 				<h1>🎯 Tombola Game</h1>
 			</button>
 			<div class="auth-section">
-				<AuthButton {authEnabled} />
+				{#if authEnabled}
+					<AuthButton {authEnabled} />
+				{:else}
+					<UserRegistration />
+				{/if}
 			</div>
 		</div>
 	</header>
