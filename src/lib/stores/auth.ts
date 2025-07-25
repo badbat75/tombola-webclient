@@ -137,7 +137,6 @@ export const auth = {
 			const response = await fetch('/api/auth/config');
 
 			if (!response.ok) {
-				console.error('Error checking auth configuration:', response.status);
 				auth.setDisabled();
 				return;
 			}
@@ -154,7 +153,6 @@ export const auth = {
 				auth.setDisabled();
 			}
 		} catch (error) {
-			console.error('Error checking auth configuration:', error);
 			// If we can't check, assume authentication is disabled for security
 			auth.setDisabled();
 		}
@@ -180,7 +178,6 @@ export const auth = {
 
 				auth.setAuthenticated(user, token, refreshToken || undefined);
 			} catch (error) {
-				console.error('Error parsing stored user data:', error);
 				auth.setUnauthenticated();
 			}
 		} else {

@@ -4,7 +4,7 @@
   import { tombolaApi } from '../api.js';
   import type { GameInfo, GameStatus } from '../types.js';
   import { getScoreText, getScoreColor } from '../scoreUtils.js';
-  import { gameActions } from '../gameStore.svelte.js';
+  import { gameActions, gameState } from '../gameStore.svelte.js';
   import CardSelectionModal from './CardSelectionModal.svelte';
 
   interface Props {
@@ -51,16 +51,62 @@
     };
   });
 
+  function getStatusPriority(status: string): number {
+    switch (status.toLowerCase()) {
+      case 'new': return 1;
+      case 'active': return 2;
+      case 'closed': return 3;
+      default: return 4;
+    }
+  }
+
+  function sortGames(games: GameInfo[]): GameInfo[] {
+    return games.sort((a, b) => {
+      // First priority: Status (new, active, closed)
+      const statusPriorityA = getStatusPriority(a.status || 'unknown');
+      const statusPriorityB = getStatusPriority(b.status || 'unknown');
+
+      if (statusPriorityA !== statusPriorityB) {
+        return statusPriorityA - statusPriorityB;
+      }
+
+      // Second priority: Creation date (most recent first)
+      // Get creation dates from game details if available, fallback to game data
+      const detailA = gameDetails.get(a.game_id);
+      const detailB = gameDetails.get(b.game_id);
+
+      const dateA = detailA?.created_at || a.created_at;
+      const dateB = detailB?.created_at || b.created_at;
+
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1; // Put games without dates at the end
+      if (!dateB) return -1;
+
+      // Parse dates and sort newest first
+      const parsedDateA = new Date(dateA).getTime();
+      const parsedDateB = new Date(dateB).getTime();
+
+      return parsedDateB - parsedDateA; // Newest first (inverted)
+    });
+  }
+
   async function loadGames() {
     try {
       loading = true;
       error = null;
+
+      // Ensure client state is restored before making API calls
+      gameActions.restoreClientState();
+
       const response = await tombolaApi.getGamesList();
       games = response.games;
       gameStats = null; // Statistics are not provided in the new API structure
 
       // Load detailed status for each game
       await loadGameDetails();
+
+      // Sort games after loading details (so we have creation dates)
+      games = sortGames(games);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load games';
     } finally {
@@ -81,7 +127,7 @@
         // This is a best-effort approach since the API doesn't directly provide this
         await loadGameCreator(game.game_id);
       } catch (err) {
-        console.warn(`Failed to load details for game ${game.game_id}:`, err);
+        // Failed to load details
       }
     });
 
@@ -120,7 +166,6 @@
         });
       }
     } catch (err) {
-      console.warn(`Failed to load creator for game ${gameId}:`, err);
       // Fallback for existing games or API errors
       gameCreators.set(gameId, {
         name: "Unknown Creator",
@@ -134,17 +179,31 @@
     if (!detail) return;
 
     try {
-      // Set the game ID in the API client
-      await gameActions.setGameId(gameId);
-
       // Check if user is the board owner by comparing names
       const isGameOwner = await checkIfUserIsGameOwner(detail);
 
       if (isGameOwner) {
-        // User is the game owner - redirect directly to board
-        console.log('User is game owner, redirecting to board');
-        await goto(`/board?gameId=${gameId}`);
+        // User is the game owner - ensure proper board registration before navigation
+        // Clear any existing game state to prevent conflicts
+        gameActions.clearError();
+
+        // Set the game ID first
+        await gameActions.setGameId(gameId);
+
+        // Pre-register as board to ensure board page can access immediately
+        const boardRegistrationSuccess = await gameActions.registerAsBoard();
+
+        if (boardRegistrationSuccess) {
+          // Now redirect to board page
+          await goto(`/board?gameId=${gameId}`);
+        } else {
+          // Registration failed - stay on current page and show error
+          return;
+        }
       } else {
+        // Set the game ID for player flow
+        await gameActions.setGameId(gameId);
+
         // User is a card player
         if (detail.status?.toLowerCase() === 'new') {
           // New game - check if user already has cards assigned
@@ -152,7 +211,6 @@
 
           if (hasExistingCards) {
             // User already has cards - redirect directly to player page
-            console.log('User already has cards in this new game, redirecting to player page');
             await goto(`/player?gameId=${gameId}`);
           } else {
             // User doesn't have cards - show card selection modal for card count
@@ -162,12 +220,9 @@
           }
         } else {
           // Active game - redirect directly to player page (may already have cards)
-          console.log('Joining active game as player');
           const success = await gameActions.register(userName, 0); // 0 cards for existing game
           if (success) {
             await goto(`/player?gameId=${gameId}`);
-          } else {
-            console.error('Failed to join active game');
           }
         }
       }
@@ -175,7 +230,7 @@
       // Notify parent that game was selected
       onGameSelected(gameId);
     } catch (error) {
-      console.error('Failed to process game selection:', error);
+      // Failed to process game selection
     }
   }
 
@@ -189,7 +244,6 @@
       const ownerInfo = await tombolaApi.getClientById(gameDetail.owner);
       return ownerInfo.name === userName;
     } catch (error) {
-      console.warn('Failed to check game ownership:', error);
       return false;
     }
   }
@@ -199,7 +253,6 @@
       // First ensure we're registered to this game and get our client ID
       const success = await gameActions.register(userName, 0); // Register with 0 cards (won't generate cards if already registered)
       if (!success) {
-        console.warn('Failed to register to game while checking for cards');
         return false;
       }
 
@@ -210,7 +263,6 @@
       // Check if user has any cards assigned
       return cardsResponse.cards && cardsResponse.cards.length > 0;
     } catch (error) {
-      console.warn('Failed to check if user has cards:', error);
       // If we can't check, assume they don't have cards to be safe
       return false;
     }
@@ -227,43 +279,30 @@
       const { cardCount } = event.detail;
 
       if (!selectedGame) {
-        console.error('No selected game');
         return;
       }
 
       if (!userName || userName.trim() === '') {
-        console.error('No userName provided:', userName);
         return;
       }
-
-      console.log('Starting card selection join:', { selectedGame, userName, cardCount });
 
       // First, set the game ID in the game store
       const gameIdSuccess = await gameActions.setGameId(selectedGame);
       if (!gameIdSuccess) {
-        console.error('Failed to set game ID');
         return;
       }
-
-      console.log('Game ID set successfully, attempting registration with 0 cards...');
 
       // Step 1: Register with 0 cards (just join the game)
       const joinSuccess = await gameActions.register(userName, 0);
       if (!joinSuccess) {
-        console.error('Failed to join game');
         return;
       }
-
-      console.log('Successfully joined game, now generating cards...');
 
       // Step 2: Generate the requested number of cards
       const cardsSuccess = await gameActions.generateCards(cardCount);
       if (!cardsSuccess) {
-        console.error('Failed to generate cards');
         return;
       }
-
-      console.log('Cards generated successfully, navigating to player page...');
 
       // Navigate to player page
       await goto(`/player?gameId=${selectedGame}`);
@@ -271,7 +310,7 @@
       // Close the card selection dialog
       closeCardSelection();
     } catch (error) {
-      console.error('Failed to join game with cards:', error);
+      // Failed to join game with cards
     }
   }
 
@@ -280,6 +319,34 @@
       creating = true;
       error = null;
 
+      // Validate user name
+      if (!userName || userName.trim() === '') {
+        error = 'Please enter your name in the registration form above before creating a game';
+        return;
+      }
+
+      // Ensure client state is restored before creating game
+      gameActions.restoreClientState();
+
+      // Check if we have a client ID, if not, register globally first
+      let hasClientId = !!tombolaApi.getCurrentClientId();
+
+      if (!hasClientId) {
+        // Need to register globally as a board client first
+        try {
+          const success = await gameActions.registerGlobally(userName, 'board');
+          if (!success) {
+            error = 'Failed to register as board client';
+            return;
+          }
+          hasClientId = true;
+        } catch (regError) {
+          error = regError instanceof Error ? regError.message : 'Failed to register as board client';
+          return;
+        }
+      }
+
+      // Now create the new game
       const response = await tombolaApi.createNewGame();
 
       // If we have creator info from the response, store it
@@ -415,7 +482,7 @@
           <div class="game-info">
             <div class="info-row">
               <span class="label">Created:</span>
-              <span class="value">{formatDate(game.created_at)}</span>
+              <span class="value">{formatDate(detail?.created_at || game.created_at)}</span>
             </div>
             <div class="info-row">
               <span class="label">Created by:</span>

@@ -72,6 +72,7 @@ export interface GameInfo {
   created_at: string;
   client_count: number;
   extracted_numbers: number;
+  owner: string;
 }
 
 export interface GameListResponse {

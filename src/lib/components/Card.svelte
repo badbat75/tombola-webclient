@@ -40,7 +40,9 @@
             class="card-cell"
             class:empty={cell === null}
             class:extracted={highlightType === 'extracted'}
-            class:achievement={highlightType === 'achievement'}
+            class:achievement={highlightType === 'achievement' || highlightType === 'achievement-latest'}
+            class:latest={highlightType === 'latest'}
+            class:achievement-latest={highlightType === 'achievement-latest'}
             class:unmarked={highlightType === 'none' && cell !== null}
           >
             {cell || ''}
@@ -170,12 +172,12 @@
     color: #333 !important;
   }
 
-  /* Light grey highlighting for extracted numbers that don't contribute to highest score */
+  /* Darker grey highlighting for extracted numbers that don't contribute to highest score */
   .card .card-cell.extracted {
-    background: #e0e0e0 !important;
-    color: black !important;
-    border-color: #bdbdbd !important;
-    box-shadow: 0 0 4px rgba(189, 189, 189, 0.5) !important;
+    background: #bbb !important;
+    color: #222 !important;
+    border-color: #777 !important;
+    box-shadow: 0 0 4px rgba(119, 119, 119, 0.6) !important;
   }
 
   /* Dark green border, light green fill, dark green font for achievement numbers */
@@ -187,6 +189,30 @@
     font-weight: bold !important;
   }
 
+  /* Special styling for latest extracted number - same gray color but emphasized */
+  .card .card-cell.latest {
+    background: #bbb !important;
+    color: #222 !important;
+    border: 2px solid #777 !important;
+    box-shadow: 0 0 6px rgba(119, 119, 119, 0.8) !important;
+    font-weight: bold !important;
+    transform: scale(1.1);
+    z-index: 10;
+    position: relative;
+  }
+
+  /* Special styling for achievement + latest number - green color with emphasis */
+  .card .card-cell.achievement-latest {
+    background: #2e7d32 !important;
+    color: white !important;
+    border: 2px solid #1b5e20 !important;
+    box-shadow: 0 0 8px rgba(46, 125, 50, 0.9) !important;
+    font-weight: bold !important;
+    transform: scale(1.1);
+    z-index: 10;
+    position: relative;
+  }
+
   @media (max-width: 600px) {
     .card {
       max-width: 100%;
@@ -196,6 +222,16 @@
       width: 36px;
       height: 36px;
       font-size: 14px;
+    }
+
+    .card .card-cell.latest {
+      transform: scale(1.15);
+      font-weight: bold !important;
+    }
+
+    .card .card-cell.achievement-latest {
+      transform: scale(1.15);
+      font-weight: bold !important;
     }
 
     .card-header {

@@ -31,6 +31,10 @@
   // Try to connect on mount
   onMount(async () => {
     // Allow access without authentication - let server handle auth requirements
+
+    // Restore client state from localStorage first
+    gameActions.restoreClientState();
+
     // Check for gameId in URL parameters or localStorage
     const urlGameId = $page.url.searchParams.get('gameId');
     const storedGameId = localStorage.getItem('tombola-game-id');
@@ -63,7 +67,6 @@
       const existingUserName = localStorage.getItem('tombola-user-name');
 
       if (existingClientId && existingUserName && !gameState.isRegistered) {
-        console.log('Found existing registration, restoring state...');
         gameState.clientId = existingClientId;
         gameState.playerName = existingUserName;
         gameState.isRegistered = true;

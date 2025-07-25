@@ -34,8 +34,14 @@
   });
 
   // Auto re-register board viewer when connection is restored or game changes
+  // But only if we haven't already failed registration to avoid infinite loops
   $effect(() => {
     if (gameState.isConnected && !gameState.isRegistered && !isRegistering && gameIdSet) {
+      // Check if there's already a registration error - if so, don't auto-retry
+      if (gameState.error && gameState.error.includes('Board access denied')) {
+        return; // Don't auto-retry if we already got a board access denied error
+      }
+
       // Delay the re-registration slightly to avoid rapid successive calls
       setTimeout(() => {
         if (gameState.isConnected && !gameState.isRegistered && !isRegistering) {
@@ -48,6 +54,10 @@
   // Try to connect on mount
   onMount(async () => {
     // Allow access without authentication - let server handle auth requirements
+
+    // Restore client state from localStorage first
+    gameActions.restoreClientState();
+
     // Check for gameId in URL parameters or localStorage
     const urlGameId = $page.url.searchParams.get('gameId');
     const storedGameId = localStorage.getItem('tombola-game-id');
@@ -75,20 +85,15 @@
 
     await gameActions.connect();
     if (gameState.isConnected) {
-      // Auto-register as board client (no API call needed)
-      await handleRegister();
-      // Start auto-refresh
+      // Only try to register if we don't already have an access denied error
+      if (!gameState.error || !gameState.error.includes('Board access denied')) {
+        // Check if already registered as board, if not, register
+        if (!gameState.isRegistered) {
+          await handleRegister();
+        }
+      }
+      // Start auto-refresh regardless of registration status
       gameActions.startAutoRefresh(2000);
-
-      // Debug: Log the initial game state
-      console.log('Board page - Initial game state:', {
-        isConnected: gameState.isConnected,
-        isRegistered: gameState.isRegistered,
-        gameId: gameState.gameId,
-        boardNumbers: gameState.board.numbers,
-        pouchNumbers: gameState.pouch.numbers,
-        gameStatus: gameState.gameStatus
-      });
     }
   });
 
@@ -108,33 +113,20 @@
     gameActions.clearError();
     isRegistering = true;
 
-    console.log('Board page - Starting registration process...');
-    console.log('Board page - Current localStorage (no cache):', {
-      clientId: localStorage.getItem('tombola-client-id'),
-      userName: localStorage.getItem('tombola-user-name'),
-      gameId: localStorage.getItem('tombola-game-id')
-    });
-
-    // Force clear any browser cache by adding a timestamp to localStorage reads
-    const timestamp = Date.now();
-    console.log('Board page - Forcing fresh data at timestamp:', timestamp);
-
     const success = await gameActions.registerAsBoard();
 
     if (!success) {
-      console.error('Board registration failed:', gameState.error);
       // If registration fails, show error and redirect back to home page after a delay
+      const errorMsg = gameState.error || 'Unable to register as board operator';
+
       setTimeout(() => {
-        alert('Board access denied: ' + (gameState.error || 'Unable to register as board operator'));
+        if (errorMsg.includes('Only the game creator')) {
+          alert('Board access denied: ' + errorMsg + '\n\nYou can only access board mode for games you created.');
+        } else {
+          alert('Board access denied: ' + errorMsg);
+        }
         goto('/');
       }, 1000);
-    } else {
-      console.log('Board registration successful. Current game state:', {
-        clientId: gameState.clientId,
-        playerName: gameState.playerName,
-        gameId: gameState.gameId,
-        isRegistered: gameState.isRegistered
-      });
     }
 
     isRegistering = false;
@@ -145,21 +137,12 @@
     lastExtractionResult = null;
 
     try {
-      console.log('Attempting extraction with:', {
-        isConnected: gameState.isConnected,
-        isRegistered: gameState.isRegistered,
-        gameId: gameState.gameId,
-        isGameEnded,
-        pouchCount: gameState.pouch.numbers.length
-      });
-
       const result = await tombolaApi.extractNumber();
       lastExtractionResult = `Extracted: ${result.extracted_number} (${result.numbers_remaining} remaining)`;
 
       // Refresh game state after extraction
       await gameActions.refreshGameState();
     } catch (error) {
-      console.error('Extraction error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to extract number';
 
       // Check for specific error conditions
@@ -207,41 +190,21 @@
                 </div>
               {/if}
 
-              <!-- Game Status Indicator -->
-              {#if gameState.gameStatus}
-                <div class="game-status-indicator" class:game-ended={isGameEnded}>
-                  <div class="status-info">
-                    <span class="status-label">Game Status:</span>
-                    <span class="status-value" class:closed={isGameEnded}>
-                      {#if isGameEnded}
-                        🏁 Game Ended
-                      {:else if gameState.gameStatus.status?.toLowerCase() === 'active'}
-                        🎯 Active
-                      {:else if gameState.gameStatus.status?.toLowerCase() === 'new'}
-                        🆕 New
-                      {:else}
-                        {gameState.gameStatus.status}
-                      {/if}
-                    </span>
-                  </div>
-                  {#if isGameEnded}
-                    <div class="game-ended-message">
-                      All numbers have been extracted! 🎉
-                    </div>
-                  {/if}
-                </div>
-              {/if}
-
               <div class="control-buttons">
-                {#if !isGameEnded}
-                  <button
-                    onclick={handleExtractNumber}
-                    disabled={!canExtractNumbers}
-                    class="extract-button"
-                  >
-                    {isExtracting ? 'Extracting...' : 'Extract Number'}
-                  </button>
-                {/if}
+                <button
+                  onclick={handleExtractNumber}
+                  disabled={!canExtractNumbers || isGameEnded}
+                  class="extract-button"
+                  class:game-ended={isGameEnded}
+                >
+                  {#if isGameEnded}
+                    🏁 Game Ended
+                  {:else if isExtracting}
+                    Extracting...
+                  {:else}
+                    Extract Number
+                  {/if}
+                </button>
               </div>
             </div>
           </div>
@@ -347,53 +310,20 @@
     background: #45a049;
   }
 
+  .extract-button.game-ended {
+    background: #9e9e9e !important;
+    color: #ffffff !important;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .extract-button.game-ended:hover {
+    background: #9e9e9e !important;
+  }
+
   button:disabled {
     background: #ccc !important;
     cursor: not-allowed;
-  }
-
-  .game-status-indicator {
-    background: #e3f2fd;
-    border: 2px solid #2196f3;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 16px;
-    text-align: center;
-  }
-
-  .game-status-indicator.game-ended {
-    background: #fff3e0;
-    border-color: #ff9800;
-  }
-
-  .status-info {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  .status-label {
-    font-weight: 500;
-    color: #333;
-  }
-
-  .status-value {
-    font-weight: bold;
-    color: #2196f3;
-    font-size: 1.1em;
-  }
-
-  .status-value.closed {
-    color: #ff9800;
-  }
-
-  .game-ended-message {
-    font-size: 0.9em;
-    color: #e65100;
-    font-weight: 500;
-    font-style: italic;
   }
 
   .primary-button {

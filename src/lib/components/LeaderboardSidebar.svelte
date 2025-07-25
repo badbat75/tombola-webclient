@@ -28,7 +28,6 @@
       resolvingClients.delete(clientId);
     } catch (error) {
       resolvingClients.delete(clientId);
-      console.warn(`Failed to resolve client name for ${clientId}:`, error);
     }
   }
 

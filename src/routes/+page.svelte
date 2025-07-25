@@ -3,9 +3,20 @@
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import { authStore, auth } from '$lib/stores/auth.js';
-  import { userRegistrationStore } from '$lib/stores/userRegistration.js';
+  import { userRegistrationStore, userRegistration } from '$lib/stores/userRegistration.js';
+  import { gameActions, gameState } from '$lib/gameStore.svelte.js';
   import GameSelector from '$lib/components/GameSelector.svelte';
   import HomeFooter from '$lib/components/HomeFooter.svelte';
+
+  // Immediately restore session when script loads (browser-side)
+  if (browser) {
+    const restored = gameActions.restoreClientState();
+
+    // Sync userRegistrationStore with gameState
+    if (restored && gameState.isRegistered && gameState.clientId && gameState.playerName) {
+      userRegistration.register(gameState.clientId, gameState.playerName);
+    }
+  }
 
   // Get server-side auth configuration
   let { data } = $props();

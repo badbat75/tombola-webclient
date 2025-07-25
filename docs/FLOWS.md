@@ -372,9 +372,107 @@ sequenceDiagram
     end
 ```
 
-## 7. Data Persistence Flows
+## 7. Navigation & Session Management Flows
 
-### 7.1 Client-side Data Persistence
+### 7.1 Session Persistence During Navigation
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant Layout as Layout (+layout.svelte)
+    participant HomePage as Home Page
+    participant LocalStorage as LocalStorage
+    participant GameStore as Game Store
+
+    User->>Layout: Click "Home" button
+    Layout->>Layout: handleHomeNavigation()
+    Layout->>LocalStorage: Remove game-specific data (game-id, mode)
+    Layout->>GameStore: clearGameSpecificState()
+    Note over GameStore: Clear game data, PRESERVE user registration
+    Layout->>HomePage: goto('/')
+
+    HomePage->>HomePage: Script load
+    HomePage->>GameStore: restoreClientState()
+    GameStore->>LocalStorage: Get tombola-client-id, tombola-user-name
+    LocalStorage-->>GameStore: Return registration data
+    GameStore->>GameStore: Restore isRegistered, clientId, playerName
+    HomePage->>HomePage: Sync userRegistrationStore
+    Note over HomePage: User registration preserved
+```
+
+### 7.2 Fixed Session Loss Issue (Previous Problem)
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant Layout as Layout (+layout.svelte)
+    participant HomePage as Home Page
+    participant LocalStorage as LocalStorage
+    participant GameStore as Game Store
+
+    Note over Layout: PREVIOUS ISSUE - gameActions.reset()
+    User->>Layout: Click "Home" button
+    Layout->>Layout: handleHomeNavigation()
+    Layout->>GameStore: reset() - WRONG METHOD
+    GameStore->>GameStore: Clear ALL state including registration
+    GameStore->>LocalStorage: Remove tombola-client-id, tombola-user-name
+    Layout->>HomePage: goto('/')
+
+    HomePage->>HomePage: Script load
+    HomePage->>GameStore: restoreClientState()
+    GameStore->>LocalStorage: Get registration data
+    LocalStorage-->>GameStore: null, null - DATA LOST
+    Note over HomePage: User lost, requires re-registration
+
+    Note over Layout: FIXED - gameActions.clearGameSpecificState()
+    User->>Layout: Click "Home" button
+    Layout->>Layout: handleHomeNavigation()
+    Layout->>GameStore: clearGameSpecificState() - CORRECT METHOD
+    GameStore->>GameStore: Clear ONLY game data, preserve registration
+    Note over LocalStorage: Registration data preserved
+    Layout->>HomePage: goto('/')
+
+    HomePage->>HomePage: Script load
+    HomePage->>GameStore: restoreClientState()
+    GameStore->>LocalStorage: Get registration data
+    LocalStorage-->>GameStore: Valid client_id, user_name
+    Note over HomePage: User session restored successfully
+```
+
+### 7.3 Cross-Page Navigation Flow
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant BoardPage as Board Page
+    participant HomePage as Home Page
+    participant PlayerPage as Player Page
+    participant GameStore as Game Store
+
+    Note over User: Navigation: Board → Home → Player → Board
+
+    User->>HomePage: Navigate from Board
+    HomePage->>GameStore: restoreClientState()
+    Note over GameStore: Registration preserved
+
+    User->>PlayerPage: Navigate from Home
+    PlayerPage->>GameStore: Check registration
+    GameStore-->>PlayerPage: isRegistered: true
+    Note over PlayerPage: Access granted
+
+    User->>HomePage: Navigate from Player
+    HomePage->>GameStore: restoreClientState()
+    Note over GameStore: Registration preserved
+
+    User->>BoardPage: Navigate from Home
+    BoardPage->>GameStore: registerAsBoard()
+    GameStore->>GameStore: Check ownership with preserved registration
+    Note over BoardPage: Access granted - no re-registration needed
+```
+
+## 8. Data Persistence Flows
+
+### 8.1 Client-side Data Persistence
 
 ```mermaid
 sequenceDiagram
@@ -399,7 +497,7 @@ sequenceDiagram
     end
 ```
 
-### 7.2 Server-side Game Persistence
+### 8.2 Server-side Game Persistence
 
 ```mermaid
 sequenceDiagram
@@ -425,6 +523,9 @@ sequenceDiagram
 ## Notes
 
 - **Authentication Modes**: The system supports both simple registration (name-only) and full authentication (Supabase magic links) based on server configuration
+- **Session Management**: User registration persists across all page navigation scenarios through proper state management in `clearGameSpecificState()` vs `reset()`
+- **Navigation Flow**: Fixed session loss issue where `handleHomeNavigation()` was incorrectly clearing user registration data
+- **State Separation**: Clear distinction between game-specific state (cards, board data) and global user registration state
 - **Real-time Updates**: All game interfaces use polling (3-second intervals) for real-time synchronization
 - **State Isolation**: Each game maintains completely separate state using unique game IDs
 - **Client Types**: Board clients have special privileges for game creation and number extraction

@@ -521,7 +521,31 @@ The web client automatically discovers available games, but you can also:
 - Join specific games via URL parameters
 - Bookmark specific game URLs for quick access
 
-## 🌐 Browser Support
+## � Recent Changes
+
+### Session Management & Navigation Fixes
+- **Fixed Session Loss on Navigation**: Resolved critical issue where navigating from board/player pages to home would clear user registration, requiring re-registration to access board pages
+- **Root Cause Resolution**: Fixed `handleHomeNavigation()` in layout that was calling `gameActions.reset()` instead of `gameActions.clearGameSpecificState()`, which was clearing localStorage registration data
+- **Preserved User Registration**: Navigation now properly preserves user registration while only clearing game-specific state (cards, board data, etc.)
+- **Improved Session Restoration**: Enhanced homepage to restore user session immediately on script load and synchronize with userRegistrationStore
+- **Persistent Identity**: User registration now persists correctly across all page navigation scenarios (board ↔ home ↔ player)
+
+### Navigation & Registration Improvements
+- **Fixed Board Access Registration**: Resolved issue where navigating between board → home → player → board pages would cause "Board access denied" errors
+- **Enhanced Game Selection**: GameSelector now pre-registers board owners before navigation to ensure seamless board access
+- **Optimized Board Registration**: Board page now checks registration status to avoid redundant registration calls
+- **Immediate State Cleanup**: Homepage now immediately clears game-specific state on script load to prevent stale registration errors during SvelteKit client-side navigation
+- **Clean Registration Flow**: Simplified registration restoration with clear state clearing followed by explicit global registration restoration from localStorage
+- **Defensive Auto-Registration**: Board page now avoids infinite registration loops and provides clearer error messages for access denied scenarios
+- **Improved Error Handling**: Better feedback when board registration fails with clearer error messages
+
+### UI/UX Enhancements
+- **Game Sorting**: Games now sorted by priority - New games on top, Started in middle, Closed at bottom, then by creation time (newest first)
+- **Creation Date Fix**: Resolved missing creation dates on homepage by implementing fallback logic (`detail.created_at || game.created_at`)
+- **Board Component Optimization**: Consolidated 6 individual sections into single efficient loop structure with grid areas mapping
+- **Authentication Improvements**: GameInfoSidebar now properly validates registration state before making API calls
+
+## �🌐 Browser Support
 
 - Modern browsers with ES2020 support
 - Mobile browsers (iOS Safari, Android Chrome)

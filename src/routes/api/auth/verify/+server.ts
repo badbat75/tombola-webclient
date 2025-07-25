@@ -60,7 +60,6 @@ export const GET: RequestHandler = async ({ url }) => {
 		return redirect(302, redirectUrl);
 
 	} catch (error) {
-		console.error('[Auth Verify GET] Error:', error);
 		return redirect(302, '/?error=verification_failed');
 	}
 };
@@ -116,7 +115,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 
 			const errorData = await response.text();
-			console.error('Supabase token verification error:', errorData);
 			return json({ error: 'Invalid token' }, { status: 401 });
 		}
 
@@ -129,7 +127,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 
 	} catch (error) {
-		console.error('Token verification endpoint error:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

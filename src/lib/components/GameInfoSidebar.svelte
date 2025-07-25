@@ -34,7 +34,6 @@
       resolvingClients.delete(clientId);
     } catch (error) {
       resolvingClients.delete(clientId);
-      console.warn(`Failed to resolve client name for ${clientId}:`, error);
     }
   }
 
@@ -62,7 +61,7 @@
 
   // Load players data
   async function loadPlayers() {
-    if (!gameState.isConnected || !gameState.gameId) return;
+    if (!gameState.isConnected || !gameState.gameId || !gameState.isRegistered) return;
 
     try {
       loading = true;
@@ -75,7 +74,6 @@
         await resolveClientName(player.client_id);
       }
     } catch (err) {
-      console.error('Failed to load players:', err);
       error = err instanceof Error ? err.message : 'Failed to load players';
     } finally {
       loading = false;
@@ -118,7 +116,17 @@
   <div class="game-info-content">
     <h3 class="game-info-title">Game Info</h3>
 
-    {#if error}
+    {#if !gameState.isConnected || !gameState.isRegistered}
+      <div class="waiting">
+        <p>
+          {#if !gameState.isConnected}
+            🔌 Waiting for connection...
+          {:else if !gameState.isRegistered}
+            🎯 Registering as board operator...
+          {/if}
+        </p>
+      </div>
+    {:else if error}
       <div class="error">
         <p>❌ {error}</p>
       </div>
@@ -305,7 +313,7 @@
     font-size: 0.85em;
   }
 
-  .error, .loading, .no-data {
+  .error, .loading, .no-data, .waiting {
     text-align: center;
     padding: 20px;
     color: #666;
@@ -318,7 +326,14 @@
     padding: 12px;
   }
 
-  .error p {
+  .waiting {
+    color: #6c757d;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 12px;
+  }
+
+  .error p, .waiting p {
     margin: 0;
   }
 

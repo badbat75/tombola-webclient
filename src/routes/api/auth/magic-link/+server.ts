@@ -38,7 +38,6 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
 		if (!response.ok) {
 			const errorData = await response.text();
-			console.error('Supabase magic link error:', errorData);
 			return json({ error: 'Failed to send magic link' }, { status: response.status });
 		}
 
@@ -46,7 +45,6 @@ export const POST: RequestHandler = async ({ request, url }) => {
 		return json({ success: true, data });
 
 	} catch (error) {
-		console.error('Magic link endpoint error:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
 	}
 };

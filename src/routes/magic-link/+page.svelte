@@ -24,7 +24,6 @@
 
 			// Get the current page URL with all parameters
 			const currentUrl = window.location.href;
-			console.log('[Magic Link] Processing URL:', currentUrl);
 
 			// Check for Supabase error in URL hash
 			const urlObj = new URL(currentUrl);
@@ -41,7 +40,6 @@
 					} else {
 						errorMessage = errorDescription ? decodeURIComponent(errorDescription) : 'Authentication failed';
 					}
-					console.error('[Magic Link] Supabase error:', { error, errorCode, errorDescription });
 					auth.setUnauthenticated();
 					return;
 				}
@@ -51,7 +49,6 @@
 
 			if (result) {
 				status = 'success';
-				console.log('[Magic Link] Authentication successful');
 
 				// Redirect to home page after a short delay
 				setTimeout(() => {
@@ -60,13 +57,11 @@
 			} else {
 				status = 'error';
 				errorMessage = 'Invalid or expired magic link';
-				console.log('[Magic Link] Authentication failed - invalid token');
 				auth.setUnauthenticated();
 			}
 		} catch (error) {
 			status = 'error';
 			errorMessage = error instanceof Error ? error.message : 'Authentication failed';
-			console.error('[Magic Link] Authentication error:', error);
 			auth.setUnauthenticated();
 		}
 	});

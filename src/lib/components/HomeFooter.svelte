@@ -11,9 +11,13 @@
   let { showGameInfo = false, authEnabled = true }: Props = $props();
 
   async function handleRefresh() {
-    // On homepage, we might not have a specific game, so just show a simple message
-    if (showGameInfo && gameState.gameId) {
+    // On homepage, only refresh if we're in a proper game context
+    if (showGameInfo && gameState.gameId && gameState.isRegistered && gameState.isConnected) {
+      // Only refresh if we're properly registered and connected to the game
       await gameActions.refreshGameState();
+    } else {
+      // Clear any stale errors when not in a valid game context
+      gameActions.clearError();
     }
   }
 </script>

@@ -249,6 +249,72 @@ export const load: PageServerLoad = async ({ cookies }) => {
 - **Token Handling**: Automatic refresh and secure storage
 - **CORS Configuration**: Proper API endpoint protection
 
+## Session Management & Navigation
+
+### State Management Architecture
+
+The application uses a two-tier state management system:
+
+#### Global State (`gameStore.svelte.ts`)
+- **User Registration**: Persistent identity across all games
+- **Game-Specific State**: Cards, board data, current game context
+- **Clear Separation**: Distinct methods for clearing different state levels
+
+```typescript
+// Clear only game-specific data, preserve user registration
+gameActions.clearGameSpecificState()
+
+// Clear ALL data including user registration (complete logout)
+gameActions.reset()
+```
+
+#### Local Storage Persistence
+- **User Identity**: `tombola-client-id`, `tombola-user-name`
+- **Game Context**: `tombola-game-id`, `tombola-mode`
+- **Auth Tokens**: `supabase-auth-token` (when auth enabled)
+
+### Navigation Flow Management
+
+#### Layout-Level Navigation (`+layout.svelte`)
+The root layout handles cross-page navigation with proper state management:
+
+```typescript
+function handleHomeNavigation() {
+  // Clear game-specific localStorage
+  localStorage.removeItem('tombola-game-id');
+  localStorage.removeItem('tombola-mode');
+
+  // Clear ONLY game state, preserve user registration
+  gameActions.clearGameSpecificState();
+
+  goto('/');
+}
+```
+
+#### Session Restoration (`+page.svelte`)
+Homepage restores user session on load:
+
+```typescript
+if (browser) {
+  const restored = gameActions.restoreClientState();
+
+  // Sync registration stores
+  if (restored && gameState.isRegistered) {
+    userRegistration.register(gameState.clientId, gameState.playerName);
+  }
+}
+```
+
+### Critical Fix: Session Loss Prevention
+
+**Previous Issue**: Navigation home cleared user registration requiring re-registration.
+
+**Root Cause**: `handleHomeNavigation()` called `gameActions.reset()` which cleared localStorage registration data.
+
+**Solution**: Changed to `gameActions.clearGameSpecificState()` which preserves user registration while clearing only game-specific state.
+
+**Result**: User registration now persists across all navigation scenarios (board ↔ home ↔ player).
+
 ## Component Architecture
 
 ### Design System

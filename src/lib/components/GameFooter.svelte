@@ -20,15 +20,7 @@
     {#if gameState.isRegistered && gameState.clientId}
       <div class="status-item">
         <span class="label">Player:</span>
-        <span class="value">{gameState.clientId.slice(-8)}</span>
-      </div>
-    {/if}
-
-    <!-- Game Info -->
-    {#if gameState.gameStatus}
-      <div class="status-item">
-        <span class="label">Game:</span>
-        <span class="value">{gameState.gameStatus.game_id}</span>
+        <span class="value">{gameState.clientId}</span>
       </div>
     {/if}
 
@@ -41,12 +33,6 @@
     <div class="status-item">
       <span class="label">Remaining:</span>
       <span class="value">{gameState.pouch.numbers.length}/90</span>
-    </div>
-
-    <!-- Published Score -->
-    <div class="status-item">
-      <span class="label">Score:</span>
-      <span class="value score-highlight">{gameState.scoreCard.published_score}</span>
     </div>
 
     <!-- Refresh Button -->
@@ -142,11 +128,6 @@
   .value {
     font-weight: 600;
     color: white;
-  }
-
-  .score-highlight {
-    color: #ffc107;
-    font-weight: bold;
   }
 
   .error-item {

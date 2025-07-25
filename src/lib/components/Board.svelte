@@ -76,6 +76,12 @@
     return index >= 0 ? index + 1 : null;
   };
 
+  // Check if a number is the latest extracted number
+  const isLatestExtracted = (number: number) => {
+    if (gameState.board.numbers.length === 0) return false;
+    return gameState.board.numbers[gameState.board.numbers.length - 1] === number;
+  };
+
   // Check if a number is part of an achievement (completed line)
   const isAchievementNumber = (number: number) => {
     if (!isNumberExtracted(number)) {
@@ -100,9 +106,9 @@
         const highestAchievements = gameState.scoreCard.score_map[highestScore.toString()];
         if (highestAchievements) {
           for (const achievement of highestAchievements) {
-            // Only include achievements from the board client (0000000000000000)
+            // Only include achievements from the board card (card_id "0000000000000000")
             // and that have multiple numbers (actual lines)
-            if (achievement.client_id === "0000000000000000" && achievement.numbers.length >= 2) {
+            if (achievement.card_id === "0000000000000000" && achievement.numbers.length >= 2) {
               achievementNumbers.push(...achievement.numbers);
             }
           }
@@ -117,163 +123,87 @@
 
     return false;
   };
+
+  // Get the highlight type for a board number - prioritize achievement over latest
+  const getBoardHighlightType = (number: number) => {
+    if (!isNumberExtracted(number)) {
+      return 'none';
+    }
+
+    const isAchievement = isAchievementNumber(number);
+    const isLatest = isLatestExtracted(number);
+
+    // If it's both achievement and latest, achievement takes priority
+    if (isAchievement && isLatest) {
+      return 'achievement-latest';
+    }
+
+    if (isAchievement) {
+      return 'achievement';
+    }
+
+    if (isLatest) {
+      return 'latest';
+    }
+
+    return 'extracted';
+  };
 </script>
 
 <div class="board-container" class:large={size === 'large'}>
   <h4>Board</h4>
 
   <div class="board-sections">
-    <!-- Row 1 -->
-    <div class="board-section" style="grid-area: 1 / 1;">
-      <div class="section-grid">
-        {#each boardSections[0] as row}
-          <div class="board-row">
-            {#each row as number}
-              <div
-                class="board-number"
-                class:extracted={isNumberExtracted(number)}
-                class:achievement={isAchievementNumber(number)}
-                class:hidden={!isNumberExtracted(number)}
-                title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-              >
-                {#if isNumberExtracted(number)}
-                  <span class="number">{number}</span>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/each}
+    {#each boardSections as section, sectionIndex}
+      {@const gridAreas = [
+        '1 / 1',      // Section 0: Top-left
+        '1 / 3',      // Section 1: Top-right
+        '3 / 1',      // Section 2: Middle-left
+        '3 / 3',      // Section 3: Middle-right
+        '5 / 1',      // Section 4: Bottom-left
+        '5 / 3'       // Section 5: Bottom-right
+      ]}
+
+      <div class="board-section" style="grid-area: {gridAreas[sectionIndex]};">
+        <div class="section-grid">
+          {#each section as row}
+            <div class="board-row">
+              {#each row as number}
+                {@const highlightType = getBoardHighlightType(number)}
+                <div
+                  class="board-number"
+                  class:extracted={highlightType === 'extracted'}
+                  class:achievement={highlightType === 'achievement' || highlightType === 'achievement-latest'}
+                  class:latest-extracted={highlightType === 'latest'}
+                  class:achievement-latest={highlightType === 'achievement-latest'}
+                  class:hidden={!isNumberExtracted(number)}
+                  title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${highlightType === 'achievement' || highlightType === 'achievement-latest' ? ' - Achievement!' : ''}${highlightType === 'latest' || highlightType === 'achievement-latest' ? ' - Latest!' : ''}` : `Number ${number}`}
+                >
+                  {#if isNumberExtracted(number)}
+                    <span class="number">{number}</span>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/each}
+        </div>
       </div>
-    </div>
+    {/each}
 
     <!-- Vertical separator -->
     <div class="vertical-separator" style="grid-area: 1 / 2 / 6 / 2;"></div>
 
-    <div class="board-section" style="grid-area: 1 / 3;">
-      <div class="section-grid">
-        {#each boardSections[1] as row}
-          <div class="board-row">
-            {#each row as number}
-              <div
-                class="board-number"
-                class:extracted={isNumberExtracted(number)}
-                class:achievement={isAchievementNumber(number)}
-                class:hidden={!isNumberExtracted(number)}
-                title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-              >
-                {#if isNumberExtracted(number)}
-                  <span class="number">{number}</span>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
-    </div>
-
-    <!-- Horizontal separator 1 -->
+    <!-- Horizontal separators -->
     <div class="horizontal-separator" style="grid-area: 2 / 1 / 2 / 4;"></div>
-
-    <!-- Row 2 -->
-    <div class="board-section" style="grid-area: 3 / 1;">
-      <div class="section-grid">
-        {#each boardSections[2] as row}
-          <div class="board-row">
-            {#each row as number}
-              <div
-                class="board-number"
-                class:extracted={isNumberExtracted(number)}
-                class:achievement={isAchievementNumber(number)}
-                class:hidden={!isNumberExtracted(number)}
-                title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-              >
-                {#if isNumberExtracted(number)}
-                  <span class="number">{number}</span>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
-    </div>
-
-    <div class="board-section" style="grid-area: 3 / 3;">
-      <div class="section-grid">
-        {#each boardSections[3] as row}
-          <div class="board-row">
-            {#each row as number}
-              <div
-                class="board-number"
-                class:extracted={isNumberExtracted(number)}
-                class:achievement={isAchievementNumber(number)}
-                class:hidden={!isNumberExtracted(number)}
-                title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-              >
-                {#if isNumberExtracted(number)}
-                  <span class="number">{number}</span>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
-    </div>
-
-    <!-- Horizontal separator 2 -->
     <div class="horizontal-separator" style="grid-area: 4 / 1 / 4 / 4;"></div>
-
-    <!-- Row 3 -->
-    <div class="board-section" style="grid-area: 5 / 1;">
-      <div class="section-grid">
-        {#each boardSections[4] as row}
-          <div class="board-row">
-            {#each row as number}
-              <div
-                class="board-number"
-                class:extracted={isNumberExtracted(number)}
-                class:achievement={isAchievementNumber(number)}
-                class:hidden={!isNumberExtracted(number)}
-                title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-              >
-                {#if isNumberExtracted(number)}
-                  <span class="number">{number}</span>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
-    </div>
-
-    <div class="board-section" style="grid-area: 5 / 3;">
-      <div class="section-grid">
-        {#each boardSections[5] as row}
-          <div class="board-row">
-            {#each row as number}
-              <div
-                class="board-number"
-                class:extracted={isNumberExtracted(number)}
-                class:achievement={isAchievementNumber(number)}
-                class:hidden={!isNumberExtracted(number)}
-                title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-              >
-                {#if isNumberExtracted(number)}
-                  <span class="number">{number}</span>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
-    </div>
   </div>
 
   {#if gameState.board.numbers.length > 0}
     <div class="extraction-history">
       <h4>Recent Extractions:</h4>
       <div class="recent-numbers">
-        {#each gameState.board.numbers.slice(-8) as number, index}
-          <span class="recent-number" class:latest={index === gameState.board.numbers.slice(-8).length - 1}>
+        {#each gameState.board.numbers.slice(-8).reverse() as number, index}
+          <span class="recent-number" class:latest={index === 0}>
             {number}
           </span>
         {/each}
@@ -377,6 +307,26 @@
     box-shadow: 0 0 8px rgba(46, 125, 50, 0.4) !important;
   }
 
+  .board-container .board-number.latest-extracted {
+    background: #ff5722 !important;
+    color: white !important;
+    border: 2px solid #d84315 !important;
+    box-shadow: 0 0 6px rgba(255, 87, 34, 0.4) !important;
+    animation: pulse 2s ease-in-out;
+    transform: scale(1.1);
+    z-index: 10;
+  }
+
+  .board-container .board-number.achievement-latest {
+    border: 2px solid #1b5e20 !important;
+    background: #2e7d32 !important;
+    color: white !important;
+    box-shadow: 0 0 8px rgba(46, 125, 50, 0.7) !important;
+    animation: pulse 2s ease-in-out;
+    transform: scale(1.1);
+    z-index: 10;
+  }
+
   .board-container .board-number.extracted:hover {
     border-color: #d84315 !important; /* darker orange on hover */
     background: #f0d0a0 !important; /* slightly darker wood on hover */
@@ -411,19 +361,24 @@
   }
 
   .recent-number {
-    background: #e3f2fd;
-    color: #1976d2;
-    padding: 3px 6px;
-    border-radius: 4px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5deb3;
+    color: #ff5722;
+    border-radius: 50%;
     font-weight: bold;
-    border: 1px solid #bbdefb;
-    font-size: 12px;
+    border: 1px solid #ff5722;
+    font-size: 10px;
   }
 
   .recent-number.latest {
     background: #ff5722;
     color: white;
-    border-color: #d84315;
+    border: 2px solid #d84315;
+    box-shadow: 0 0 6px rgba(255, 87, 34, 0.4);
     animation: pulse 2s ease-in-out;
   }
 
@@ -523,6 +478,20 @@
     font-size: 22px;
   }
 
+  .board-container.large .board-number.latest-extracted {
+    background: #ff5722 !important;
+    color: white !important;
+    border: 2px solid #d84315 !important;
+    box-shadow: 0 0 8px rgba(255, 87, 34, 0.4) !important;
+  }
+
+  .board-container.large .board-number.achievement-latest {
+    border: 2px solid #1b5e20 !important;
+    background: #2e7d32 !important;
+    color: white !important;
+    box-shadow: 0 0 8px rgba(46, 125, 50, 0.7) !important;
+  }
+
   /* Large board title */
   .board-container.large h4 {
     font-size: 1.8em;
@@ -559,14 +528,23 @@
   }
 
   .board-container.large .recent-number {
-    padding: 6px 12px;
-    font-size: 16px;
-    border-radius: 6px;
-    border: 2px solid #bbdefb;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    border-radius: 50%;
+    background: #f5deb3;
+    color: #ff5722;
+    border: 2px solid #ff5722;
   }
 
   .board-container.large .recent-number.latest {
+    background: #ff5722;
+    color: white;
     border: 2px solid #d84315;
+    box-shadow: 0 0 8px rgba(255, 87, 34, 0.4);
   }
 
   /* Large board mobile responsive styles */
@@ -590,8 +568,9 @@
     }
 
     .board-container.large .recent-number {
-      padding: 5px 10px;
-      font-size: 14px;
+      width: 28px;
+      height: 28px;
+      font-size: 12px;
     }
   }
 
@@ -615,8 +594,9 @@
     }
 
     .board-container.large .recent-number {
-      padding: 4px 8px;
-      font-size: 13px;
+      width: 24px;
+      height: 24px;
+      font-size: 11px;
     }
   }
 </style>

@@ -39,7 +39,6 @@
 						auth.setUnauthenticated();
 					}
 				} catch (error) {
-					console.error('Magic link processing failed:', error);
 					auth.setUnauthenticated();
 				}
 			}
@@ -54,8 +53,8 @@
 		localStorage.removeItem('tombola-game-id');
 		localStorage.removeItem('tombola-mode');
 
-		// Clear game state (this will clear cards and registration)
-		gameActions.reset();
+		// Clear only game-specific state, preserve user registration
+		gameActions.clearGameSpecificState();
 
 		// Navigate to home
 		goto('/');

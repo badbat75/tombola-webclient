@@ -39,9 +39,6 @@ export class AuthClient {
 			throw new Error('Authentication is not available on this server.');
 		}
 
-		console.log(`[Auth Client] Sending magic link request for: ${email}`);
-		console.log(`[Auth Client] Target endpoint: /api/auth/magic-link`);
-
 		try {
 			const response = await fetch('/api/auth/magic-link', {
 				method: 'POST',
@@ -51,14 +48,9 @@ export class AuthClient {
 				body: JSON.stringify({ email }),
 			});
 
-			console.log(`[Auth Client] Response status: ${response.status}`);
-			console.log(`[Auth Client] Response ok: ${response.ok}`);
-
 			const result = await response.json();
 
 			if (!response.ok) {
-				console.error(`[Auth Client] Authentication failed:`, result);
-
 				// Provide helpful error messages based on status
 				if (response.status === 501) {
 					throw new Error('Authentication is not configured on this server.');
@@ -69,12 +61,9 @@ export class AuthClient {
 				}
 			}
 
-			console.log(`[Auth Client] Success response:`, result);
 			return { success: true, message: 'Magic link sent successfully' };
 
 		} catch (error) {
-			console.error(`[Auth Client] Network or parsing error:`, error);
-
 			// Handle network errors
 			if (error instanceof TypeError && error.message.includes('fetch')) {
 				throw new Error(`Cannot connect to authentication service. Please check your connection.`);
@@ -89,8 +78,6 @@ export class AuthClient {
 	 * Verify authentication token with SSR endpoint
 	 */
 	async verifyToken(accessToken: string, refreshToken?: string): Promise<VerifyResponse> {
-		console.log(`[Auth Client] Verifying token with SSR endpoint`);
-
 		try {
 			const response = await fetch('/api/auth/verify', {
 				method: 'POST',
@@ -106,11 +93,9 @@ export class AuthClient {
 			const result = await response.json();
 
 			if (!response.ok) {
-				console.error(`[Auth Client] Token verification failed:`, result);
 				return { success: false, error: result.error || 'Token verification failed' };
 			}
 
-			console.log(`[Auth Client] Token verification success:`, result);
 			return {
 				success: true,
 				user: result.user,
@@ -119,7 +104,6 @@ export class AuthClient {
 			};
 
 		} catch (error) {
-			console.error(`[Auth Client] Token verification error:`, error);
 			return { success: false, error: 'Network error during token verification' };
 		}
 	}
@@ -150,7 +134,6 @@ export class AuthClient {
 			}
 
 			if (!accessToken) {
-				console.log('[Auth Client] No access token found in URL');
 				return null;
 			}
 
@@ -158,7 +141,6 @@ export class AuthClient {
 			const verification = await this.verifyToken(accessToken, refreshToken || undefined);
 
 		if (!verification.success || !verification.user || !verification.access_token) {
-			console.error('[Auth Client] Token verification failed:', verification.error);
 			return null;
 		}
 
@@ -167,7 +149,6 @@ export class AuthClient {
 			token: verification.access_token,
 			refreshToken: verification.refresh_token
 		};		} catch (error) {
-			console.error('Error processing magic link token:', error);
 			return null;
 		}
 	}
@@ -189,7 +170,6 @@ export async function processMagicLink(url: string): Promise<boolean> {
 
 		return false;
 	} catch (error) {
-		console.error('Magic link processing error:', error);
 		return false;
 	}
 }

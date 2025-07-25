@@ -26,7 +26,7 @@
             const client = await tombolaApi.getClientById(achievement.client_id);
             clientName = client.name;
           } catch (error) {
-            console.warn(`Could not fetch client name for ${achievement.client_id}`);
+            // Could not fetch client name, use default
           }
 
           achievements.push({
@@ -46,7 +46,6 @@
         return a.clientName.localeCompare(b.clientName);
       });
     } catch (error) {
-      console.error('Error processing achievements:', error);
       return [];
     }
   });

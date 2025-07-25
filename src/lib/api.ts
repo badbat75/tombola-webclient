@@ -27,7 +27,7 @@ const API_BASE_URL = `${API_PROTOCOL}://${API_HOST}:${API_PORT}`;
 const DEBUG_MODE = import.meta.env.DEBUG_MODE === 'true' || true; // Enable debug for now
 const debugLog = (message: string, data?: any) => {
   if (DEBUG_MODE) {
-    console.log(`[Tombola API] ${message}`, data || '');
+    // Debug logging disabled in production
   }
 };
 
@@ -36,20 +36,29 @@ class TombolaApiClient {
   private gameId: string | null = null;
 
   constructor() {
-    console.log(`[Tombola API] Initialized with endpoint: ${API_BASE_URL}`);
-    if (DEBUG_MODE) {
-      console.log(`[Tombola API] Debug mode enabled`);
-      console.log(`[Tombola API] Configuration:`, {
-        host: API_HOST,
-        port: API_PORT,
-        protocol: API_PROTOCOL
-      });
+    // Try to restore client ID from localStorage on initialization
+    this.initializeFromStorage();
+  }
+
+  private initializeFromStorage() {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const storedClientId = localStorage.getItem('tombola-client-id');
+      if (storedClientId) {
+        debugLog(`Restoring client ID from localStorage: ${storedClientId}`);
+        this.clientId = storedClientId;
+      }
     }
   }
 
   setClientId(clientId: string) {
     debugLog(`Setting client ID: ${this.clientId} -> ${clientId}`);
     this.clientId = clientId;
+
+    // Always persist to localStorage when setting client ID
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem('tombola-client-id', clientId);
+      debugLog(`Persisted client ID to localStorage: ${clientId}`);
+    }
   }
 
   setGameId(gameId: string) {
@@ -61,6 +70,19 @@ class TombolaApiClient {
   clearState() {
     debugLog(`Clearing API client state - ClientID: ${this.clientId}, GameID: ${this.gameId}`);
     this.clientId = null;
+    this.gameId = null;
+
+    // Only clear localStorage if explicitly requested
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('tombola-client-id');
+      localStorage.removeItem('tombola-user-name');
+      debugLog('Cleared client data from localStorage');
+    }
+  }
+
+  // Clear only game-specific state, preserve client ID
+  clearGameState() {
+    debugLog(`Clearing game state - keeping ClientID: ${this.clientId}`);
     this.gameId = null;
   }
 
@@ -90,6 +112,11 @@ class TombolaApiClient {
     if (authState.state === 'authenticated' && authState.token) {
       headers['Authorization'] = `Bearer ${authState.token}`;
       debugLog('Added JWT token to request headers');
+    }
+
+    // Ensure client ID is available - try to restore from localStorage if missing
+    if (!this.clientId) {
+      this.initializeFromStorage();
     }
 
     if (this.clientId && !headers['X-Client-ID']) {
