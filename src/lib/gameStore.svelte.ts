@@ -69,7 +69,11 @@ export const gameActions = {
 
   async register(playerName: string, cardCount: number = 6): Promise<boolean> {
     try {
+      console.log('Register called with:', { playerName, cardCount, gameId: gameState.gameId });
+
       const response = await tombolaApi.joinGame(playerName, 'player', cardCount);
+      console.log('Join game response:', response);
+
       gameState.clientId = response.client_id;
       gameState.playerName = playerName;
       gameState.isRegistered = true;
@@ -78,13 +82,19 @@ export const gameActions = {
       // Store player name for future re-registration
       previousPlayerName = playerName;
 
+      // Store registration info in localStorage for persistence across page loads
+      localStorage.setItem('tombola-client-id', response.client_id);
+      localStorage.setItem('tombola-user-name', playerName);
+
       // Cache the client name for leaderboard display
       clientNameCache.set(response.client_id, playerName);
 
       tombolaApi.setClientId(response.client_id);
 
       // Load assigned cards
+      console.log('Loading cards...');
       await gameActions.loadCards();
+      console.log('Cards loaded:', gameState.cards.length);
 
       return true;
     } catch (error) {
@@ -196,20 +206,29 @@ export const gameActions = {
   },
 
   async loadCards(): Promise<void> {
-    if (!gameState.isRegistered) return;
+    if (!gameState.isRegistered) {
+      console.log('Cannot load cards: not registered');
+      return;
+    }
 
     try {
+      console.log('Loading assigned cards...');
       const assignments = await tombolaApi.listAssignedCards();
+      console.log('Card assignments:', assignments);
+
       const cards: Card[] = [];
 
       for (const assignment of assignments.cards) {
+        console.log('Loading card:', assignment.card_id);
         const card = await tombolaApi.getAssignedCard(assignment.card_id);
         cards.push(card);
       }
 
       gameState.cards = cards;
       gameState.error = null;
+      console.log('Successfully loaded cards:', cards.length);
     } catch (error) {
+      console.error('Error loading cards:', error);
       gameState.error = error instanceof Error ? error.message : 'Failed to load cards';
     }
   },
@@ -246,11 +265,32 @@ export const gameActions = {
         return;
       }
 
+      // Debug: Log the scoreCard data structure
+      console.log('🎯 ScoreCard data received:', {
+        publishedScore: scoreCard.published_score,
+        scoreMap: scoreCard.score_map,
+        scoreMapKeys: Object.keys(scoreCard.score_map),
+        scoreMapEntries: Object.entries(scoreCard.score_map).map(([score, achievements]) => ({
+          score,
+          achievementCount: achievements.length,
+          achievements: achievements.map(ach => ({
+            clientId: ach.client_id,
+            cardId: ach.card_id,
+            numbersCount: ach.numbers ? ach.numbers.length : 0,
+            numbers: ach.numbers
+          }))
+        })),
+        rawScoreCard: scoreCard
+      });
+
       gameState.gameStatus = status;
       gameState.board = board;
       gameState.pouch = pouch;
       gameState.scoreCard = scoreCard;
       gameState.error = null;
+
+      // Additional debug: Log the updated gameState scoreCard
+      console.log('🎯 Updated gameState.scoreCard:', gameState.scoreCard);
     } catch (error) {
       gameState.error = error instanceof Error ? error.message : 'Failed to refresh game state';
     }
@@ -349,23 +389,86 @@ export const gameUtils = {
 
   // Get the numbers that contributed to the highest published score for a specific card
   getHighestScoreNumbers(cardId: string): number[] {
-    const publishedScore = gameState.scoreCard.published_score;
+    // Look for this card's achievements in the score map (from board/API)
+    const achievementNumbers: number[] = [];
 
-    if (publishedScore === 0) {
-      return [];
-    }
+    // Debug: Log the score map data structure
+    console.log('Score map for card', cardId, ':', {
+      publishedScore: gameState.scoreCard.published_score,
+      scoreMap: gameState.scoreCard.score_map,
+      scoreMapKeys: Object.keys(gameState.scoreCard.score_map)
+    });
 
-    // Look for this card in the score map for the published score
-    const achievements = gameState.scoreCard.score_map[publishedScore];
-    if (achievements) {
+    // Find the highest score achievement for this card from the score map
+    let highestScore = 0;
+    for (const [scoreStr, achievements] of Object.entries(gameState.scoreCard.score_map)) {
+      const score = parseInt(scoreStr);
+      console.log(`Checking score ${score} with ${achievements.length} achievements`);
+
       for (const achievement of achievements) {
-        if (achievement.card_id === cardId) {
-          return achievement.numbers;
+        console.log('Achievement:', achievement);
+        if (achievement.card_id === cardId && score > highestScore) {
+          highestScore = score;
+          console.log(`Found higher score ${score} for card ${cardId}`, achievement);
+
+          // The achievement should contain the numbers that contributed to this score
+          if (achievement.numbers && Array.isArray(achievement.numbers)) {
+            achievementNumbers.length = 0; // Clear previous numbers
+            achievementNumbers.push(...achievement.numbers);
+            console.log(`Added achievement numbers: ${achievement.numbers}`);
+          }
         }
       }
     }
 
-    return [];
+    console.log(`Final achievement numbers for card ${cardId}:`, achievementNumbers);
+    return achievementNumbers;
+  },
+
+  // Get the numbers for card line completions (separate from board achievements)
+  getCardLineNumbers(cardId: string): number[] {
+    const card = gameState.cards.find(c => c.card_id === cardId);
+    if (!card) {
+      return [];
+    }
+
+    const lineNumbers: number[] = [];
+
+    // Check each row for complete lines
+    for (let rowIndex = 0; rowIndex < card.card_data.length; rowIndex++) {
+      const row = card.card_data[rowIndex];
+      const nonNullCells = row.filter(cell => cell !== null);
+      const extractedCells = row.filter(cell => cell !== null && gameUtils.isNumberExtracted(cell));
+
+      // If this row is complete, add all its numbers
+      if (extractedCells.length === nonNullCells.length && nonNullCells.length > 0) {
+        lineNumbers.push(...extractedCells.filter((cell): cell is number => cell !== null));
+      }
+    }
+
+    // Check each column for complete lines
+    for (let colIndex = 0; colIndex < 5; colIndex++) {
+      const columnNumbers: number[] = [];
+      const columnExtractedNumbers: number[] = [];
+
+      for (let rowIndex = 0; rowIndex < card.card_data.length; rowIndex++) {
+        const cell = card.card_data[rowIndex][colIndex];
+        if (cell !== null) {
+          columnNumbers.push(cell);
+          if (gameUtils.isNumberExtracted(cell)) {
+            columnExtractedNumbers.push(cell);
+          }
+        }
+      }
+
+      // If this column is complete, add all its numbers
+      if (columnExtractedNumbers.length === columnNumbers.length && columnNumbers.length > 0) {
+        lineNumbers.push(...columnExtractedNumbers);
+      }
+    }
+
+    // Remove duplicates and return
+    return [...new Set(lineNumbers)];
   },
 
   // Get the highest achievement for a specific card
@@ -419,12 +522,13 @@ export const gameUtils = {
       return 'none';
     }
 
-    const highestScoreNumbers = gameUtils.getHighestScoreNumbers(cardId);
-    if (highestScoreNumbers.includes(number)) {
-      return 'achievement'; // Yellow highlight for achievement numbers
+    // Check if this number is part of a scored achievement (from board score map)
+    const achievementNumbers = gameUtils.getHighestScoreNumbers(cardId);
+    if (achievementNumbers.includes(number)) {
+      return 'achievement'; // Green highlight for numbers that contributed to scores
     }
 
-    return 'extracted'; // Green highlight for other extracted numbers
+    return 'extracted'; // Grey highlight for other extracted numbers
   },
 
   getPlayerAchievements(): { score: number; lines: number[]; bingo: boolean } {

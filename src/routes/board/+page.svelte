@@ -7,6 +7,7 @@
   import Board from '$lib/components/Board.svelte';
   import GameFooter from '$lib/components/GameFooter.svelte';
   import LeaderboardSidebar from '$lib/components/LeaderboardSidebar.svelte';
+  import GameInfoSidebar from '$lib/components/GameInfoSidebar.svelte';
   import { tombolaApi } from '$lib/api.js';
 
   // Get server-side auth configuration
@@ -18,6 +19,10 @@
   let isExtracting = $state(false);
   let lastExtractionResult = $state<string | null>(null);
   let gameIdSet = $state(false);
+
+  // Computed properties for game state
+  let isGameEnded = $derived(gameState.gameStatus?.status?.toLowerCase() === 'closed' || gameState.pouch.numbers.length === 0);
+  let canExtractNumbers = $derived(gameState.isConnected && !isExtracting && !isGameEnded);
 
   // Redirect if user signs out (but only if auth is enabled)
   $effect(() => {
@@ -134,39 +139,40 @@
 
     isRegistering = false;
   }  async function handleExtractNumber() {
-    if (isExtracting) return;
+    if (isExtracting || !canExtractNumbers) return;
 
     isExtracting = true;
     lastExtractionResult = null;
 
     try {
       console.log('Attempting extraction with:', {
-        gameId: gameState.gameId,
-        clientId: gameState.clientId,
         isConnected: gameState.isConnected,
-        isRegistered: gameState.isRegistered
+        isRegistered: gameState.isRegistered,
+        gameId: gameState.gameId,
+        isGameEnded,
+        pouchCount: gameState.pouch.numbers.length
       });
 
       const result = await tombolaApi.extractNumber();
       lastExtractionResult = `Extracted: ${result.extracted_number} (${result.numbers_remaining} remaining)`;
 
-      // Refresh game state to show the new number
+      // Refresh game state after extraction
       await gameActions.refreshGameState();
     } catch (error) {
       console.error('Extraction error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to extract number';
 
-      // Provide helpful error messages
-      if (errorMessage.includes('board owner') || errorMessage.includes('Unauthorized')) {
+      // Check for specific error conditions
+      if (errorMessage.includes('board owner') || errorMessage.includes('creator')) {
         lastExtractionResult = `Error: Only the game creator can extract numbers. Create a new game to become a board operator.`;
-      } else if (errorMessage.includes('empty') || errorMessage.includes('remaining')) {
+      } else if (errorMessage.includes('no numbers') || errorMessage.includes('empty')) {
         lastExtractionResult = `Error: No numbers remaining in the pouch. Game is complete!`;
       } else {
         lastExtractionResult = `Error: ${errorMessage}`;
       }
+    } finally {
+      isExtracting = false;
     }
-
-    isExtracting = false;
   }
 </script>
 
@@ -201,21 +207,49 @@
                 </div>
               {/if}
 
+              <!-- Game Status Indicator -->
+              {#if gameState.gameStatus}
+                <div class="game-status-indicator" class:game-ended={isGameEnded}>
+                  <div class="status-info">
+                    <span class="status-label">Game Status:</span>
+                    <span class="status-value" class:closed={isGameEnded}>
+                      {#if isGameEnded}
+                        🏁 Game Ended
+                      {:else if gameState.gameStatus.status?.toLowerCase() === 'active'}
+                        🎯 Active
+                      {:else if gameState.gameStatus.status?.toLowerCase() === 'new'}
+                        🆕 New
+                      {:else}
+                        {gameState.gameStatus.status}
+                      {/if}
+                    </span>
+                  </div>
+                  {#if isGameEnded}
+                    <div class="game-ended-message">
+                      All numbers have been extracted! 🎉
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+
               <div class="control-buttons">
-                <button
-                  onclick={handleExtractNumber}
-                  disabled={isExtracting || !gameState.isConnected}
-                  class="extract-button"
-                >
-                  {isExtracting ? 'Extracting...' : 'Extract Number'}
-                </button>
+                {#if !isGameEnded}
+                  <button
+                    onclick={handleExtractNumber}
+                    disabled={!canExtractNumbers}
+                    class="extract-button"
+                  >
+                    {isExtracting ? 'Extracting...' : 'Extract Number'}
+                  </button>
+                {/if}
               </div>
             </div>
           </div>
 
-          <!-- Sidebar with Leaderboard -->
+          <!-- Sidebar with Leaderboard and Game Info -->
           <div class="sidebar">
             <LeaderboardSidebar />
+            <GameInfoSidebar />
           </div>
         </div>
       </div>
@@ -237,7 +271,7 @@
     margin: 0;
     padding: 0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #4a90e2 0%, #2c5aa0 100%);
+    background: var(--primary-gradient);
     min-height: 100vh;
   }
 
@@ -279,19 +313,19 @@
   .board-interface {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: var(--spacing-xl);
   }
 
   .control-panel {
-    background: white;
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    background: var(--container-bg-solid);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-xl);
+    box-shadow: var(--box-shadow);
   }
 
   .control-buttons {
     display: flex;
-    gap: 16px;
+    gap: var(--spacing-base);
     justify-content: center;
     flex-wrap: wrap;
   }
@@ -316,6 +350,50 @@
   button:disabled {
     background: #ccc !important;
     cursor: not-allowed;
+  }
+
+  .game-status-indicator {
+    background: #e3f2fd;
+    border: 2px solid #2196f3;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .game-status-indicator.game-ended {
+    background: #fff3e0;
+    border-color: #ff9800;
+  }
+
+  .status-info {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .status-label {
+    font-weight: 500;
+    color: #333;
+  }
+
+  .status-value {
+    font-weight: bold;
+    color: #2196f3;
+    font-size: 1.1em;
+  }
+
+  .status-value.closed {
+    color: #ff9800;
+  }
+
+  .game-ended-message {
+    font-size: 0.9em;
+    color: #e65100;
+    font-weight: 500;
+    font-style: italic;
   }
 
   .primary-button {
@@ -352,34 +430,34 @@
   .main-game-area {
     display: grid;
     grid-template-columns: 1fr 320px;
-    gap: 24px;
+    gap: var(--spacing-xl);
     align-items: start;
   }
 
   .board-column {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: var(--spacing-xl);
   }
 
   .board-display {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    background: var(--container-bg-solid);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--box-shadow);
   }
 
   .sidebar {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--spacing-lg);
   }
 
   .app-footer {
     background: rgba(255, 255, 255, 0.9);
-    padding: 16px;
+    padding: var(--spacing-base);
     text-align: center;
-    color: #666;
+    color: var(--text-color-secondary);
     margin-top: auto;
   }
 
@@ -397,11 +475,11 @@
   @media (max-width: 1024px) {
     .main-game-area {
       grid-template-columns: 1fr;
-      gap: 16px;
+      gap: var(--spacing-base);
     }
 
     .board-column {
-      gap: 16px;
+      gap: var(--spacing-base);
     }
 
     .control-buttons {
@@ -412,15 +490,15 @@
 
   @media (max-width: 768px) {
     .app-main {
-      padding: 16px;
+      padding: var(--spacing-base);
     }
 
     .connection-section {
-      padding: 24px 16px;
+      padding: var(--spacing-xl) var(--spacing-base);
     }
 
     .control-panel {
-      padding: 16px;
+      padding: var(--spacing-base);
     }
   }
 </style>

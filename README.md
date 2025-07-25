@@ -9,15 +9,17 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 - 👤 **Global User Identity**: Registered users can join multiple games with the same identity
 - 🎮 **Game Selection**: After registration, users can browse and join available games
 - 🎯 **Smart Game Joining**:
-  - **New Games**: Users can request cards to participate fully
-  - **Active Games**: Users can join as spectators to watch the game progress
+  - **Game Owners**: Automatically redirected to board interface (`/board?gameId={id}`)
+  - **New Games**: Direct card selection modal for choosing number of cards (1-6)
+  - **Active Games**: Direct redirect to player interface (`/player?gameId={id}`) - may already have cards assigned
 - 💾 **Persistent Identity**: User registration saved in localStorage for convenience
-- � **Flexible Flow**: No authentication required - just enter your name and start playing
+- 🔓 **Flexible Flow**: No authentication required - just enter your name and start playing
+- 📊 **Status Visibility**: Registration status displayed in footer with improved "No games available" message styling
 
 ### Multi-Game Architecture Support
 - 🎮 **Game Discovery**: Browse available games with detailed status information
 - ✨ **Game Creation**: Create new games directly from the web interface (board clients only)
-- 🔀 **Smart Game Joining**: Interactive dialog shows game details and participation options
+- 🔀 **Streamlined Game Access**: Intelligent routing eliminates unnecessary modals - users are directly taken to the appropriate interface based on their role
 - 📊 **Detailed Game Status**: View player counts, card assignments, extraction progress, and best scores
 - 📈 **Progress Visualization**: Visual progress bars showing game completion status
 - 🏆 **Achievement Tracking**: Display current best scores and prize levels per game
@@ -46,6 +48,7 @@ A modern, responsive web interface for the Tombola game, built with **SvelteKit 
 - ♿ **Accessibility**: Keyboard navigation and screen reader support
 - 🔄 **Auto-reconnection**: Robust connection handling with automatic recovery
 - 💾 **State Persistence**: Game and mode selection saved in localStorage
+- 📊 **Status Footer**: Persistent status bar showing user registration/authentication status and game context information
 
 ## 🚀 Quick Start
 
@@ -366,11 +369,12 @@ The `Board.svelte` component supports two size variants:
 - `normal` - Compact view for card players (24px circles, 11px fonts)
 - `large` - Enhanced view for operators (48px circles, 22px fonts, increased spacing)
 
-### Game Join Dialog Options
-The `GameJoinDialog.svelte` component provides different join options based on game state:
-- **New Games**: Full participation with customizable card count
-- **Active Games**: Spectator mode or rejoin with existing cards
-- **Board Access**: Exclusive to game creators with ownership verification
+### Game Access Flow
+The system provides direct, intelligent routing based on user role and game state:
+- **Board Owners**: Automatic redirect to board interface with extraction privileges
+- **New Game Players**: Card selection modal (`CardSelectionModal.svelte`) for choosing card count (1-6)
+- **Active Game Players**: Direct access to player interface, preserving existing cards
+- **Ownership Verification**: Server-side validation ensures only game creators can access board controls
 
 ### User Registration Components
 - **Simple Mode**: `UserRegistration.svelte` for name-based registration

@@ -155,11 +155,11 @@
 	}
 
 	.success-icon {
-		background: linear-gradient(135deg, #10b981, #059669);
+		background: var(--success-gradient);
 	}
 
 	.error-icon {
-		background: linear-gradient(135deg, #ef4444, #dc2626);
+		background: var(--error-gradient);
 	}
 
 	h2 {
@@ -183,7 +183,7 @@
 
 	.return-home {
 		padding: 0.75rem 1.5rem;
-		background: linear-gradient(135deg, #667eea, #764ba2);
+		background: var(--primary-gradient);
 		color: white;
 		text-decoration: none;
 		border-radius: 8px;

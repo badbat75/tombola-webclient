@@ -62,15 +62,15 @@
   // Get current player's stats
   const playerStats = $derived(() => gameUtils.getPlayerAchievements());
 
-  // Simple leaderboard data from scorecard
+  // Simple leaderboard data from scorecard - showing all achievements
   const topAchievements = $derived(() => {
-    const achievements = [];
+    const allAchievements = [];
 
-    // Get all achievements from score map and sort by score
+    // Get all achievements from score map without grouping by player
     for (const [scoreStr, scoreAchievements] of Object.entries(gameState.scoreCard.score_map)) {
       const score = parseInt(scoreStr);
       for (const achievement of scoreAchievements) {
-        achievements.push({
+        allAchievements.push({
           clientId: achievement.client_id,
           cardId: achievement.card_id,
           score: score,
@@ -81,8 +81,17 @@
       }
     }
 
-    // Sort by score descending
-    return achievements.sort((a, b) => b.score - a.score).slice(0, 10);
+    // Sort by score descending, then by card ID for consistent ordering
+    return allAchievements
+      .sort((a, b) => {
+        // First sort by score (highest first)
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        // Then by card ID for consistent ordering when scores are equal
+        return a.cardId.localeCompare(b.cardId);
+      })
+      .slice(0, 20); // Show more achievements since we're not grouping
   });
 
   // Auto-resolve client names for achievements

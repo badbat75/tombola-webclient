@@ -5,6 +5,7 @@
   import { authStore, auth } from '$lib/stores/auth.js';
   import { userRegistrationStore } from '$lib/stores/userRegistration.js';
   import GameSelector from '$lib/components/GameSelector.svelte';
+  import HomeFooter from '$lib/components/HomeFooter.svelte';
 
   // Get server-side auth configuration
   let { data } = $props();
@@ -123,81 +124,118 @@
   <title>Tombola Game - Choose Mode</title>
 </svelte:head>
 
-{#if !authEnabled || $authStore.state === 'unauthenticated' || $authStore.state === 'magic-link-sent'}
-  <!-- Show games even when not authenticated -->
-  <div class="combined-selector">
-    <!-- Email notification toast (only if auth is enabled) -->
-    {#if authEnabled && $authStore.state === 'magic-link-sent'}
-      <div
-        class="email-notification"
-        onclick={handleBackgroundClick}
-        onkeydown={handleNotificationKeydown}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="notification-title"
-        tabindex="0"
-      >
-        <div class="notification-content">
-          <div class="check-icon">✓</div>
-          <h3 id="notification-title">Check Your Email!</h3>
-          <p>We've sent you a magic link. Click it to sign in and start playing Tombola!</p>
-          <p class="note">The link will expire in 10 minutes for security.</p>
-          <button class="dismiss-btn" onclick={dismissNotification}>
-            Dismiss
-          </button>
-          <p class="note">Press Escape to close</p>
+<div class="app">
+  <main class="app-main">
+    {#if !authEnabled || $authStore.state === 'unauthenticated' || $authStore.state === 'magic-link-sent'}
+      <!-- Show games even when not authenticated -->
+      <div class="combined-selector">
+        <!-- Email notification toast (only if auth is enabled) -->
+        {#if authEnabled && $authStore.state === 'magic-link-sent'}
+          <div
+            class="email-notification"
+            onclick={handleBackgroundClick}
+            onkeydown={handleNotificationKeydown}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notification-title"
+            tabindex="0"
+          >
+            <div class="notification-content">
+              <div class="check-icon">✓</div>
+              <h3 id="notification-title">Check Your Email!</h3>
+              <p>We've sent you a magic link. Click it to sign in and start playing Tombola!</p>
+              <p class="note">The link will expire in 10 minutes for security.</p>
+              <button class="dismiss-btn" onclick={dismissNotification}>
+                Dismiss
+              </button>
+              <p class="note">Press Escape to close</p>
+            </div>
+          </div>
+        {/if}
+
+        <div class="game-selection">
+          <h2>Available Games</h2>
+
+          {#if authEnabled}
+            <p class="browse-note">🔒 Sign in to join any of these games</p>
+            <GameSelector onGameSelected={onGameSelected} readonly authEnabled={authEnabled} />
+          {:else}
+            {#if !$userRegistrationStore.isRegistered}
+              <p class="browse-note">📝 Register your name in the header to join games</p>
+            {/if}
+            <GameSelector
+              onGameSelected={onGameSelected}
+              authEnabled={authEnabled}
+              userRegistered={$userRegistrationStore.isRegistered}
+              userName={$userRegistrationStore.userName || ''}
+            />
+          {/if}
+        </div>
+      </div>
+    {:else if authEnabled && ($authStore.state === 'loading' || $authStore.state === 'magic-link-processing')}
+      <div class="welcome-section">
+        <div class="welcome-card">
+          <div class="spinner"></div>
+          <h2>Loading...</h2>
+          <p>Setting up your Tombola experience</p>
+        </div>
+      </div>
+    {:else if authEnabled && $authStore.state === 'authenticated'}
+      <div class="welcome-section">
+        <div class="user-welcome">
+          <h2>Welcome back, {$authStore.user?.name || $authStore.user?.email || 'Player'}! 🎉</h2>
+          <p>Ready to play some Tombola? Choose your game and mode below.</p>
+        </div>
+      </div>
+
+      <div class="combined-selector">
+        <div class="game-selection">
+          <h2>Choose a Game</h2>
+          <GameSelector
+            onGameSelected={onGameSelected}
+            authEnabled={authEnabled}
+            userRegistered={true}
+            userName={$authStore.user?.name || $authStore.user?.email?.split('@')[0] || 'Player'}
+          />
         </div>
       </div>
     {/if}
+  </main>
 
-    <div class="game-selection">
-      <h2>Available Games</h2>
-
-      {#if authEnabled}
-        <p class="browse-note">🔒 Sign in to join any of these games</p>
-        <GameSelector onGameSelected={onGameSelected} readonly authEnabled={authEnabled} />
-      {:else}
-        {#if !$userRegistrationStore.isRegistered}
-          <p class="browse-note">📝 Register your name in the header to join games</p>
-        {/if}
-        <GameSelector
-          onGameSelected={onGameSelected}
-          authEnabled={authEnabled}
-          userRegistered={$userRegistrationStore.isRegistered}
-          userName={$userRegistrationStore.userName || ''}
-        />
-      {/if}
-    </div>
-  </div>
-{:else if authEnabled && ($authStore.state === 'loading' || $authStore.state === 'magic-link-processing')}
-  <div class="welcome-section">
-    <div class="welcome-card">
-      <div class="spinner"></div>
-      <h2>Loading...</h2>
-      <p>Setting up your Tombola experience</p>
-    </div>
-  </div>
-{:else if authEnabled && $authStore.state === 'authenticated'}
-  <div class="welcome-section">
-    <div class="user-welcome">
-      <h2>Welcome back, {$authStore.user?.name || $authStore.user?.email || 'Player'}! 🎉</h2>
-      <p>Ready to play some Tombola? Choose your game and mode below.</p>
-    </div>
-  </div>
-
-    <div class="combined-selector">
-    <div class="game-selection">
-      <h2>Choose a Game</h2>
-      <GameSelector onGameSelected={onGameSelected} authEnabled={authEnabled} />
-    </div>
-  </div>
-{/if}
+  <!-- Sticky Footer -->
+  {#if $userRegistrationStore.isRegistered || (authEnabled && $authStore.state === 'authenticated')}
+    <HomeFooter {authEnabled} />
+  {/if}
+</div>
 
 <style>
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--primary-gradient);
+    min-height: 100vh;
+  }
+
+  .app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-main {
+    flex: 1;
+    padding: var(--spacing-lg);
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
   .welcome-section {
     display: flex;
     justify-content: center;
-    padding: 2rem;
+    padding: var(--spacing-2xl);
     min-height: 400px;
     align-items: center;
   }
@@ -288,7 +326,7 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #10b981, #059669);
+    background: var(--success-gradient);
     color: white;
     display: flex;
     align-items: center;

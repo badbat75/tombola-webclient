@@ -166,25 +166,25 @@
   }
 
   .card-cell.unmarked {
-    background: white;
-    color: #333;
+    background: white !important;
+    color: #333 !important;
   }
 
   /* Light grey highlighting for extracted numbers that don't contribute to highest score */
-  .card-cell.extracted {
-    background: #e0e0e0;
-    color: black;
-    border-color: #bdbdbd;
-    box-shadow: 0 0 4px rgba(189, 189, 189, 0.5);
+  .card .card-cell.extracted {
+    background: #e0e0e0 !important;
+    color: black !important;
+    border-color: #bdbdbd !important;
+    box-shadow: 0 0 4px rgba(189, 189, 189, 0.5) !important;
   }
 
   /* Dark green border, light green fill, dark green font for achievement numbers */
-  .card-cell.achievement {
-    background: #c8e6c9;
-    color: #2e7d32;
-    border-color: #2e7d32;
-    box-shadow: 0 0 4px rgba(46, 125, 50, 0.7);
-    font-weight: bold;
+  .card .card-cell.achievement {
+    background: #c8e6c9 !important;
+    color: #2e7d32 !important;
+    border-color: #2e7d32 !important;
+    box-shadow: 0 0 4px rgba(46, 125, 50, 0.7) !important;
+    font-weight: bold !important;
   }
 
   @media (max-width: 600px) {

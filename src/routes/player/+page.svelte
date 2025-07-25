@@ -4,20 +4,19 @@
   import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth.js';
   import { gameState, gameActions } from '$lib/gameStore.svelte.js';
+  import { tombolaApi } from '$lib/api.js';
   import Card from '$lib/components/Card.svelte';
   import Board from '$lib/components/Board.svelte';
   import GameFooter from '$lib/components/GameFooter.svelte';
   import LeaderboardSidebar from '$lib/components/LeaderboardSidebar.svelte';
+  import GameInfoSidebar from '$lib/components/GameInfoSidebar.svelte';
   import ScoreBoard from '$lib/components/ScoreBoard.svelte';
 
   // Get server-side auth configuration
   let { data } = $props();
   const { authEnabled } = data;
 
-  let playerName = $state('');
-  let cardCount = $state(6);
   let isConnecting = $state(false);
-  let isRegistering = $state(false);
   let gameIdSet = $state(false);
 
   // Redirect if user signs out (but only if auth is enabled)
@@ -26,25 +25,6 @@
     if (authEnabled && $authStore.state === 'unauthenticated' && gameIdSet) {
       alert('You have been signed out. Redirecting to home page.');
       goto('/');
-    }
-  });
-
-  // Auto-fill player name based on authentication status
-  $effect(() => {
-    if (!gameState.isRegistered && !playerName) {
-      // Priority 1: Use authenticated user's name or email (if auth is enabled and user is authenticated)
-      if ($authStore.state === 'authenticated' && $authStore.user?.name) {
-        playerName = $authStore.user.name;
-      } else if ($authStore.state === 'authenticated' && $authStore.user?.email) {
-        // Use the part before @ if no name is available
-        playerName = $authStore.user.email.split('@')[0];
-      } else {
-        // Priority 2: Fallback to previous session name (always available, regardless of auth state)
-        const previousName = gameActions.getPreviousPlayerName();
-        if (previousName) {
-          playerName = previousName;
-        }
-      }
     }
   });
 
@@ -78,6 +58,21 @@
 
     await gameActions.connect();
     if (gameState.isConnected) {
+      // Check if there's an existing registration in localStorage
+      const existingClientId = localStorage.getItem('tombola-client-id');
+      const existingUserName = localStorage.getItem('tombola-user-name');
+
+      if (existingClientId && existingUserName && !gameState.isRegistered) {
+        console.log('Found existing registration, restoring state...');
+        gameState.clientId = existingClientId;
+        gameState.playerName = existingUserName;
+        gameState.isRegistered = true;
+        tombolaApi.setClientId(existingClientId);
+
+        // Load cards for this registered user
+        await gameActions.loadCards();
+      }
+
       // Start auto-refresh
       gameActions.startAutoRefresh(3000);
     }
@@ -93,21 +88,6 @@
     }
     isConnecting = false;
   }
-
-  async function handleRegister() {
-    if (!playerName.trim()) return;
-
-    // Clear any existing errors when starting registration
-    gameActions.clearError();
-
-    isRegistering = true;
-
-    // Use default card count (6) for re-registrations, otherwise use selected count
-    const finalCardCount = gameActions.getPreviousPlayerName() ? 6 : cardCount;
-
-    await gameActions.register(playerName.trim(), finalCardCount);
-    isRegistering = false;
-  }
 </script>
 
 <div class="app">
@@ -121,88 +101,52 @@
           {isConnecting ? 'Connecting...' : 'Connect'}
         </button>
       </div>
+    {:else if !gameState.isRegistered}
+      <!-- Not registered - redirect to home -->
+      <div class="registration-section">
+        <h2>No Player Registration Found</h2>
+        <p>You need to join a game first. Please go back to the home page and select a game to join.</p>
+        <button onclick={() => goto('/')} class="primary-button">
+          Go to Home Page
+        </button>
+      </div>
     {:else}
-      <!-- Registration Section -->
-      {#if !gameState.isRegistered}
-        <div class="registration-section">
-          <h2>
-            {gameActions.getPreviousPlayerName() ? 'Re-register for New Game' : 'Register as Player'}
-          </h2>
-
-          {#if gameActions.getPreviousPlayerName()}
-            <div class="game-change-notice">
-              <p>🎯 A new game has started! Please register again to continue playing.</p>
-            </div>
-          {/if}
-
-          {#if gameState.error}
-            <div class="error-message">
-              <p>{gameState.error}</p>
-            </div>
-          {/if}
-
-          <div class="form-group">
-            <label for="playerName">Your Name:</label>
-            <input
-              type="text"
-              id="playerName"
-              bind:value={playerName}
-              placeholder="Enter your name"
-              disabled={isRegistering}
-            />
-          </div>
-          {#if !gameActions.getPreviousPlayerName()}
-            <div class="form-group">
-              <label for="cardCount">Number of Cards (1-6):</label>
-              <input
-                type="number"
-                id="cardCount"
-                bind:value={cardCount}
-                min="1"
-                max="6"
-                disabled={isRegistering}
-              />
-            </div>
-          {/if}
-          <button onclick={handleRegister} disabled={isRegistering} class="primary-button">
-            {#if isRegistering}
-              Registering...
-            {:else if gameActions.getPreviousPlayerName()}
-              Join New Game
-            {:else}
-              Register & Generate Cards
-            {/if}
-          </button>
-        </div>
-      {:else}
-        <!-- Game Interface -->
-        <div class="game-interface">
-          <!-- Main Content Area -->
-          <div class="main-content">
-            <!-- Left Column: Cards -->
-            <div class="cards-column">
-              {#if gameState.cards.length > 0}
-                <div class="section cards-section">
-                  <h2>Your Cards ({gameState.cards.length})</h2>
-                  <div class="cards-grid">
-                    {#each gameState.cards as card (card.card_id)}
-                      <Card {card} showCardId={true} />
-                    {/each}
-                  </div>
+      <!-- Game Interface -->
+      <div class="game-interface">
+        <!-- Main Content Area -->
+        <div class="main-content">
+          <!-- Left Column: Cards -->
+          <div class="cards-column">
+            {#if gameState.cards.length > 0}
+              <div class="section cards-section">
+                <h2>Your Cards ({gameState.cards.length})</h2>
+                <div class="cards-grid">
+                  {#each gameState.cards as card (card.card_id)}
+                    <Card {card} showCardId={true} />
+                  {/each}
                 </div>
-              {/if}
-            </div>
-
-            <!-- Right Column: Board and Leaderboard -->
-            <div class="right-column">
-              <div class="section board-section">
-                <Board />
               </div>
-              <LeaderboardSidebar />
+            {:else}
+              <div class="section cards-section">
+                <h2>No Cards Generated</h2>
+                <p>You haven't generated any cards yet. Please go back to the home page and join a game.</p>
+                <button onclick={() => goto('/')} class="primary-button">
+                  Go to Home Page
+                </button>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Right Column: Board and Leaderboard -->
+          <div class="right-column">
+            <div class="section board-section">
+              <Board />
             </div>
+            <LeaderboardSidebar />
+            <GameInfoSidebar />
           </div>
         </div>
-      {/if}
+      </div>
     {/if}
   </main>
 
@@ -218,10 +162,7 @@
 
 <style>
   :global(body) {
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--primary-gradient);
     min-height: 100vh;
   }
 
@@ -242,113 +183,37 @@
 
   .connection-section,
   .registration-section {
-    background: white;
-    border-radius: 12px;
-    padding: 32px;
+    background: var(--container-bg-solid);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-2xl);
     text-align: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--box-shadow-heavy);
     max-width: 500px;
     margin: 0 auto;
   }
 
   .connection-section h2,
   .registration-section h2 {
-    margin: 0 0 16px 0;
-    color: #333;
+    margin: 0 0 var(--spacing-base) 0;
+    color: var(--text-color-primary);
   }
 
-  .connection-section p {
-    margin: 16px 0;
-    color: #666;
-  }
-
-  .form-group {
-    margin-bottom: 16px;
-    text-align: left;
-  }
-
-  .game-change-notice {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 20px;
-    text-align: center;
-  }
-
-  .game-change-notice p {
-    margin: 0;
-    color: #856404;
-    font-weight: 500;
-  }
-
-  .error-message {
-    background: #f8d7da;
-    border: 1px solid #f5c6cb;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 20px;
-    text-align: center;
-  }
-
-  .error-message p {
-    margin: 0;
-    color: #721c24;
-    font-weight: 500;
-  }
-
-  .form-group label {
-    display: block;
-    margin-bottom: 4px;
-    font-weight: bold;
-    color: #555;
-  }
-
-  .form-group input {
-    width: 100%;
-    padding: 10px;
-    border: 2px solid #ddd;
-    border-radius: 6px;
-    font-size: 16px;
-    box-sizing: border-box;
-  }
-
-  .form-group input:focus {
-    outline: none;
-    border-color: #667eea;
-  }
-
-  .primary-button {
-    background: #667eea;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.2s ease;
-  }
-
-  .primary-button:hover:not(:disabled) {
-    background: #5a6fd8;
-  }
-
-  .primary-button:disabled {
-    background: #ccc;
-    cursor: not-allowed;
+  .connection-section p,
+  .registration-section p {
+    margin: var(--spacing-base) 0;
+    color: var(--text-color-secondary);
   }
 
   .game-interface {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: var(--spacing-xl);
   }
 
   .main-content {
     display: grid;
     grid-template-columns: 1050px 320px;
-    gap: 32px;
+    gap: var(--spacing-2xl);
     align-items: start;
     justify-content: center;
   }
@@ -356,28 +221,21 @@
   .cards-column {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: var(--spacing-xl);
     max-width: 1050px;
   }
 
   .right-column {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--spacing-xl);
     height: 100%;
   }
 
-  .section {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  }
-
   .cards-section {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background: var(--container-bg-solid);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--box-shadow-light);
     overflow-y: auto;
   }
 
@@ -387,28 +245,27 @@
     padding: 0;
     border-radius: 0;
     box-shadow: none;
-    margin-bottom: 16px; /* add some spacing between board and leaderboard */
   }
 
   .section h2 {
-    margin: 0 0 16px 0;
-    color: #333;
+    margin: 0 0 var(--spacing-base) 0;
+    color: var(--text-color-primary);
     text-align: center;
   }
 
   .cards-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    gap: var(--spacing-lg);
     justify-items: center;
     max-width: 1050px;
   }
 
   .app-footer {
     background: rgba(255, 255, 255, 0.9);
-    padding: 16px;
+    padding: var(--spacing-base);
     text-align: center;
-    color: #666;
+    color: var(--text-color-secondary);
     margin-top: auto;
   }
 
@@ -416,26 +273,19 @@
     margin: 0;
   }
 
-  code {
-    background: #f5f5f5;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-family: monospace;
-  }
-
   @media (max-width: 768px) {
     .app-main {
-      padding: 16px;
+      padding: var(--spacing-base);
     }
 
     .connection-section,
     .registration-section {
-      padding: 24px 16px;
+      padding: var(--spacing-xl) var(--spacing-base);
     }
 
     .main-content {
       grid-template-columns: 1fr;
-      gap: 16px;
+      gap: var(--spacing-base);
       justify-content: stretch;
     }
 

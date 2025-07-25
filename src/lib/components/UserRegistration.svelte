@@ -93,7 +93,6 @@
 	{#if isRegistered && registeredUserName}
 		<div class="registered-user">
 			<span class="user-name">👤 {registeredUserName}</span>
-			<span class="client-id">({registeredClientId})</span>
 			<button
 				class="unregister-btn"
 				onclick={handleUnregister}
@@ -149,13 +148,6 @@
 		color: white;
 		font-weight: 500;
 		font-size: 0.9rem;
-	}
-
-	.client-id {
-		color: rgba(255, 255, 255, 0.7);
-		font-size: 0.75rem;
-		font-family: 'Courier New', monospace;
-		margin-left: 0.5rem;
 	}
 
 	.unregister-btn {

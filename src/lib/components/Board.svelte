@@ -135,7 +135,6 @@
                 class:achievement={isAchievementNumber(number)}
                 class:hidden={!isNumberExtracted(number)}
                 title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-                style={isAchievementNumber(number) ? 'border: 2px solid #2e7d32 !important; background: #c8e6c9 !important; color: #2e7d32 !important;' : ''}
               >
                 {#if isNumberExtracted(number)}
                   <span class="number">{number}</span>
@@ -161,7 +160,6 @@
                 class:achievement={isAchievementNumber(number)}
                 class:hidden={!isNumberExtracted(number)}
                 title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-                style={isAchievementNumber(number) ? 'border: 2px solid #2e7d32 !important; background: #c8e6c9 !important; color: #2e7d32 !important;' : ''}
               >
                 {#if isNumberExtracted(number)}
                   <span class="number">{number}</span>
@@ -188,7 +186,6 @@
                 class:achievement={isAchievementNumber(number)}
                 class:hidden={!isNumberExtracted(number)}
                 title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-                style={isAchievementNumber(number) ? 'border: 2px solid #2e7d32 !important; background: #c8e6c9 !important; color: #2e7d32 !important;' : ''}
               >
                 {#if isNumberExtracted(number)}
                   <span class="number">{number}</span>
@@ -211,7 +208,6 @@
                 class:achievement={isAchievementNumber(number)}
                 class:hidden={!isNumberExtracted(number)}
                 title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-                style={isAchievementNumber(number) ? 'border: 2px solid #2e7d32 !important; background: #c8e6c9 !important; color: #2e7d32 !important;' : ''}
               >
                 {#if isNumberExtracted(number)}
                   <span class="number">{number}</span>
@@ -238,7 +234,6 @@
                 class:achievement={isAchievementNumber(number)}
                 class:hidden={!isNumberExtracted(number)}
                 title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-                style={isAchievementNumber(number) ? 'border: 2px solid #2e7d32 !important; background: #c8e6c9 !important; color: #2e7d32 !important;' : ''}
               >
                 {#if isNumberExtracted(number)}
                   <span class="number">{number}</span>
@@ -261,7 +256,6 @@
                 class:achievement={isAchievementNumber(number)}
                 class:hidden={!isNumberExtracted(number)}
                 title={isNumberExtracted(number) ? `Extracted #${getExtractionOrder(number)}${isAchievementNumber(number) ? ' - Achievement!' : ''}` : `Number ${number}`}
-                style={isAchievementNumber(number) ? 'border: 2px solid #2e7d32 !important; background: #c8e6c9 !important; color: #2e7d32 !important;' : ''}
               >
                 {#if isNumberExtracted(number)}
                   <span class="number">{number}</span>
@@ -370,17 +364,17 @@
   }
 
   .board-container .board-number.extracted {
-    border: 1px solid #ff5722 !important; /* orange border when extracted */
+    border: 2px solid #ff5722 !important; /* orange border when extracted */
     background: #f5deb3 !important; /* light wood color (wheat) when extracted */
     color: #ff5722 !important; /* orange text when extracted */
-    box-shadow: 0 0 8px rgba(255, 87, 34, 0.4);
+    box-shadow: 0 0 8px rgba(255, 87, 34, 0.4) !important;
   }
 
   .board-container .board-number.achievement {
-    border: 1px solid #2e7d32 !important; /* dark green border for achievements */
+    border: 2px solid #2e7d32 !important; /* dark green border for achievements */
     background: #c8e6c9 !important; /* light green fill for achievements */
     color: #2e7d32 !important; /* dark green text for achievements */
-    box-shadow: 0 0 8px rgba(46, 125, 50, 0.4);
+    box-shadow: 0 0 8px rgba(46, 125, 50, 0.4) !important;
   }
 
   .board-container .board-number.extracted:hover {

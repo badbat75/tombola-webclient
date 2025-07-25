@@ -5,7 +5,7 @@
   import type { GameInfo, GameStatus } from '../types.js';
   import { getScoreText, getScoreColor } from '../scoreUtils.js';
   import { gameActions } from '../gameStore.svelte.js';
-  import GameJoinDialog from './GameJoinDialog.svelte';
+  import CardSelectionModal from './CardSelectionModal.svelte';
 
   interface Props {
     onGameSelected: (gameId: string) => void;
@@ -24,14 +24,31 @@
   let loading = $state(true);
   let creating = $state(false);
   let error = $state<string | null>(null);
+  let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
-  // Dialog state
-  let showJoinDialog = $state(false);
+  // Dialog state - only card selection modal is used now
   let selectedGame = $state<string | null>(null);
   let selectedGameDetail = $state<GameStatus | null>(null);
 
-  onMount(async () => {
-    await loadGames();
+  // Card selection modal state
+  let showCardSelection = $state(false);
+
+  onMount(() => {
+    loadGames();
+
+    // Start auto-refresh every 5 seconds
+    refreshInterval = setInterval(() => {
+      if (!loading && !creating) {
+        loadGames();
+      }
+    }, 5000);
+
+    // Cleanup interval on component destroy
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
   });
 
   async function loadGames() {
@@ -112,64 +129,149 @@
     }
   }
 
-  function selectGame(gameId: string) {
+  async function selectGame(gameId: string) {
     const detail = getGameDetail(gameId);
-    if (detail) {
-      selectedGame = gameId;
-      selectedGameDetail = detail;
-      showJoinDialog = true;
-    }
-  }
+    if (!detail) return;
 
-  function closeJoinDialog() {
-    showJoinDialog = false;
-    selectedGame = null;
-    selectedGameDetail = null;
-  }
-
-  async function handleJoinGame(event: CustomEvent) {
     try {
-      const { gameId, cardCount } = event.detail;
-
       // Set the game ID in the API client
       await gameActions.setGameId(gameId);
 
-      // Register with the selected number of cards
-      const success = await gameActions.register(userName, cardCount);
+      // Check if user is the board owner by comparing names
+      const isGameOwner = await checkIfUserIsGameOwner(detail);
 
-      if (success) {
-        // Navigate to player page
-        await goto(`/player?gameId=${gameId}`);
+      if (isGameOwner) {
+        // User is the game owner - redirect directly to board
+        console.log('User is game owner, redirecting to board');
+        await goto(`/board?gameId=${gameId}`);
       } else {
-        console.error('Failed to register for game');
+        // User is a card player
+        if (detail.status?.toLowerCase() === 'new') {
+          // New game - check if user already has cards assigned
+          const hasExistingCards = await checkIfUserHasCards(gameId);
+
+          if (hasExistingCards) {
+            // User already has cards - redirect directly to player page
+            console.log('User already has cards in this new game, redirecting to player page');
+            await goto(`/player?gameId=${gameId}`);
+          } else {
+            // User doesn't have cards - show card selection modal for card count
+            selectedGame = gameId;
+            selectedGameDetail = detail;
+            showCardSelection = true;
+          }
+        } else {
+          // Active game - redirect directly to player page (may already have cards)
+          console.log('Joining active game as player');
+          const success = await gameActions.register(userName, 0); // 0 cards for existing game
+          if (success) {
+            await goto(`/player?gameId=${gameId}`);
+          } else {
+            console.error('Failed to join active game');
+          }
+        }
       }
 
       // Notify parent that game was selected
       onGameSelected(gameId);
-
-      // Close the dialog
-      selectedGame = null;
-      selectedGameDetail = null;
     } catch (error) {
-      console.error('Failed to join game:', error);
+      console.error('Failed to process game selection:', error);
     }
   }
 
-  async function handleJoinBoard(event: CustomEvent) {
+  async function checkIfUserIsGameOwner(gameDetail: GameStatus): Promise<boolean> {
+    if (!gameDetail.owner || !userName) {
+      return false;
+    }
+
     try {
-      const { gameId } = event.detail;
-
-      // Set the game ID in the API client
-      await gameActions.setGameId(gameId);
-
-      // Navigate to board page with gameId parameter
-      await goto(`/board?gameId=${gameId}`);
-
-      // Close the dialog
-      selectedGame = null;
-      selectedGameDetail = null;
+      // Get the owner's client info from the server
+      const ownerInfo = await tombolaApi.getClientById(gameDetail.owner);
+      return ownerInfo.name === userName;
     } catch (error) {
-      console.error('Failed to join game as board owner:', error);
+      console.warn('Failed to check game ownership:', error);
+      return false;
+    }
+  }
+
+  async function checkIfUserHasCards(gameId: string): Promise<boolean> {
+    try {
+      // First ensure we're registered to this game and get our client ID
+      const success = await gameActions.register(userName, 0); // Register with 0 cards (won't generate cards if already registered)
+      if (!success) {
+        console.warn('Failed to register to game while checking for cards');
+        return false;
+      }
+
+      // Set the game ID and check for existing cards
+      await gameActions.setGameId(gameId);
+      const cardsResponse = await tombolaApi.listAssignedCards();
+
+      // Check if user has any cards assigned
+      return cardsResponse.cards && cardsResponse.cards.length > 0;
+    } catch (error) {
+      console.warn('Failed to check if user has cards:', error);
+      // If we can't check, assume they don't have cards to be safe
+      return false;
+    }
+  }
+
+  function closeCardSelection() {
+    showCardSelection = false;
+    selectedGame = null;
+    selectedGameDetail = null;
+  }
+
+  async function handleCardSelectionJoin(event: CustomEvent) {
+    try {
+      const { cardCount } = event.detail;
+
+      if (!selectedGame) {
+        console.error('No selected game');
+        return;
+      }
+
+      if (!userName || userName.trim() === '') {
+        console.error('No userName provided:', userName);
+        return;
+      }
+
+      console.log('Starting card selection join:', { selectedGame, userName, cardCount });
+
+      // First, set the game ID in the game store
+      const gameIdSuccess = await gameActions.setGameId(selectedGame);
+      if (!gameIdSuccess) {
+        console.error('Failed to set game ID');
+        return;
+      }
+
+      console.log('Game ID set successfully, attempting registration with 0 cards...');
+
+      // Step 1: Register with 0 cards (just join the game)
+      const joinSuccess = await gameActions.register(userName, 0);
+      if (!joinSuccess) {
+        console.error('Failed to join game');
+        return;
+      }
+
+      console.log('Successfully joined game, now generating cards...');
+
+      // Step 2: Generate the requested number of cards
+      const cardsSuccess = await gameActions.generateCards(cardCount);
+      if (!cardsSuccess) {
+        console.error('Failed to generate cards');
+        return;
+      }
+
+      console.log('Cards generated successfully, navigating to player page...');
+
+      // Navigate to player page
+      await goto(`/player?gameId=${selectedGame}`);
+
+      // Close the card selection dialog
+      closeCardSelection();
+    } catch (error) {
+      console.error('Failed to join game with cards:', error);
     }
   }
 
@@ -268,9 +370,6 @@
           {creating ? '🔄 Creating...' : '🆕 Create New Game'}
         </button>
       {/if}
-      <button class="refresh-btn" onclick={loadGames} disabled={loading}>
-        {loading ? '🔄' : '↻'} Refresh
-      </button>
     </div>
   </div>
 
@@ -382,15 +481,13 @@
     </div>
   {/if}
 
-  <!-- Game Join Dialog -->
-  {#if showJoinDialog && selectedGameDetail && userName}
-    <GameJoinDialog
-      bind:isOpen={showJoinDialog}
-      game={selectedGameDetail}
-      {userName}
-      on:join={handleJoinGame}
-      on:joinBoard={handleJoinBoard}
-      on:close={closeJoinDialog}
+  <!-- Card Selection Modal for new games -->
+  {#if showCardSelection && selectedGameDetail}
+    <CardSelectionModal
+      bind:isOpen={showCardSelection}
+      gameTitle={selectedGameDetail.game_id || ''}
+      on:join={handleCardSelectionJoin}
+      on:close={closeCardSelection}
     />
   {/if}
 </div>
@@ -459,25 +556,6 @@
     color: #7b1fa2;
   }
 
-  .refresh-btn {
-    background: #f8f9fa;
-    border: 2px solid #dee2e6;
-    border-radius: 8px;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .refresh-btn:hover:not(:disabled) {
-    background: #e9ecef;
-    border-color: #adb5bd;
-  }
-
-  .refresh-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
   .create-btn {
     background: #28a745;
     color: white;
@@ -527,12 +605,26 @@
   .loading, .no-games {
     text-align: center;
     padding: 40px 20px;
-    color: #6c757d;
+    color: #495057;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    border: 2px solid #e9ecef;
+    margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .loading p, .no-games p {
-    margin: 0;
+    margin: 0 0 10px 0;
     font-size: 1.2em;
+    font-weight: 500;
+    color: #343a40;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  }
+
+  .no-games p:first-child {
+    font-size: 1.4em;
+    color: #495057;
+    margin-bottom: 15px;
   }
 
   .games-grid {
@@ -630,7 +722,7 @@
   }
 
   .progress-fill {
-    background: linear-gradient(90deg, #28a745, #20c997);
+    background: var(--success-gradient);
     height: 100%;
     border-radius: 8px;
     transition: width 0.3s ease;

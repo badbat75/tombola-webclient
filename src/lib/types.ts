@@ -85,6 +85,20 @@ export interface NewGameResponse {
   board_owner?: string; // Client ID of the game creator
 }
 
+// Players types
+export interface Player {
+  client_id: string;
+  client_type: string;
+  card_count: number;
+}
+
+export interface PlayersResponse {
+  game_id: string;
+  total_players: number;
+  total_cards: number;
+  players: Player[];
+}
+
 // Game state
 export interface GameState {
   isConnected: boolean;

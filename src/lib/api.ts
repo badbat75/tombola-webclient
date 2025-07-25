@@ -11,7 +11,8 @@ import type {
   ApiError,
   GameListResponse,
   GameInfo,
-  NewGameResponse
+  NewGameResponse,
+  PlayersResponse
 } from './types.js';
 import { authStore } from './stores/auth.js';
 import { get } from 'svelte/store';
@@ -236,6 +237,14 @@ class TombolaApiClient {
     }
 
     return this.request<GameStatus>(`/${this.gameId}/status`);
+  }
+
+  async getPlayers(): Promise<PlayersResponse> {
+    if (!this.gameId) {
+      throw new Error('Game ID must be set before getting players');
+    }
+
+    return this.request<PlayersResponse>(`/${this.gameId}/players`);
   }
 
   // Board Client Operations (Game-specific, only for authorized clients)
