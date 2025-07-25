@@ -527,6 +527,11 @@ The web client automatically discovers available games, but you can also:
 - Mobile browsers (iOS Safari, Android Chrome)
 - Progressive Web App features ready for future enhancement
 
+## 📚 Documentation
+
+- **[FLOWS.md](docs/FLOWS.md)** - Comprehensive sequence diagrams showing all authentication, registration, and game process flows
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical architecture and component overview
+
 ## 🤝 Contributing
 
 This web client is part of the larger Tombola project. See the main project README for contribution guidelines.
